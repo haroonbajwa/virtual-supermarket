@@ -32,32 +32,154 @@ const productCategories = [
   }
 ];
 
-const ProductBox = ({ 
+const ProductSlot = ({ 
   position, 
-  size = [0.3, 0.3, 0.3], 
+  size = [0.35, 0.4, 0.3],  
   category,
   variant,
   rotation = 0
 }) => {
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <Box args={size}>
+      {/* Product Slot Frame */}
+      <Box args={[size[0], size[1], 0.02]} position={[0, 0, size[2]/2]}>
         <meshStandardMaterial 
-          color={variant.color} 
-          roughness={0.6}
+          color="#2c3e50"
+          roughness={0.8}
           metalness={0.2}
         />
       </Box>
+      
+      {/* Product Display Area */}
+      <Box args={[size[0] - 0.05, size[1] - 0.05, size[2] - 0.05]} position={[0, 0, 0]}>
+        <meshStandardMaterial 
+          color={variant.color} 
+          roughness={0.6}
+          metalness={0.1}
+        />
+      </Box>
+
+      {/* Variant Name Label Directly on Surface */}
       <Text
-        position={[0, size[1] + 0.05, 0]}
-        fontSize={0.05}
-        color={variant.color}
+        position={[0, 0, size[2]/2 + 1]}
+        fontSize={0.03}
+        color="white"
         anchorX="center"
-        anchorY="bottom"
-        rotation={[0, rotation, 0]}
+        anchorY="top"
       >
         {variant.name}
       </Text>
+
+      {/* Category Name Label Directly on Surface */}
+      <Text
+        position={[0, 0, size[2]/2 + 1]}
+        fontSize={0.025}
+        color="lightgray"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {category.name}
+      </Text>
+    </group>
+  );
+};
+
+const ControlButton = ({ position, color, label, onClick }) => (
+  <group position={position} onClick={onClick}>
+    <Box args={[0.15, 0.15, 0.15]}>
+      <meshStandardMaterial color={color} roughness={0.5} metalness={0.3} />
+    </Box>
+    <Text 
+      position={[0, 0, 0.08]} 
+      scale={0.1}
+      color="white"
+      anchorX="center"
+      anchorY="middle"
+    >
+      {label}
+    </Text>
+  </group>
+);
+
+const ControlPanel = ({ 
+  position, 
+  shelves, 
+  slotsPerRow, 
+  onUpdateShelves, 
+  onUpdateSlots 
+}) => {
+  return (
+    <group position={position}>
+      {/* Control Panel Background */}
+      <Box args={[1, 0.2, 0.3]} position={[0, 0, 0]}>
+        <meshStandardMaterial 
+          color="#2c3e50" 
+          roughness={0.7} 
+          metalness={0.2}
+        />
+      </Box>
+
+      {/* Shelf Controls */}
+      <group position={[-0.25, 0, 0.08]}>
+        <Text 
+          position={[0, 0.15, 0]} 
+          scale={0.08}
+          color="white"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Shelves: {shelves}
+        </Text>
+        <ControlButton
+          position={[-0.1, 0, 0]}
+          color="#e74c3c"
+          label="-"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (shelves > 1) onUpdateShelves(shelves - 1);
+          }}
+        />
+        <ControlButton
+          position={[0.1, 0, 0]}
+          color="#2ecc71"
+          label="+"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (shelves < 6) onUpdateShelves(shelves + 1);
+          }}
+        />
+      </group>
+
+      {/* Slots Controls */}
+      <group position={[0.25, 0, 0.08]}>
+        <Text 
+          position={[0, 0.15, 0]} 
+          scale={0.08}
+          color="white"
+          anchorX="center"
+          anchorY="middle"
+        >
+          Slots: {slotsPerRow}
+        </Text>
+        <ControlButton
+          position={[-0.1, 0, 0]}
+          color="#e74c3c"
+          label="-"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (slotsPerRow > 1) onUpdateSlots(slotsPerRow - 1);
+          }}
+        />
+        <ControlButton
+          position={[0.1, 0, 0]}
+          color="#2ecc71"
+          label="+"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (slotsPerRow < 5) onUpdateSlots(slotsPerRow + 1);
+          }}
+        />
+      </group>
     </group>
   );
 };
@@ -66,48 +188,50 @@ const Rack = ({
   position = [0, 0, 0], 
   size = { width: 2, depth: 1, height: 3 }, 
   shelves = 3, 
-  color = '#455A64',
+  color = '#34495e',
   onUpdateShelves 
 }) => {
   const [productPlacement, setProductPlacement] = useState([]);
-  const [boxesPerRow, setBoxesPerRow] = useState(3);
+  const [slotsPerRow, setSlotsPerRow] = useState(3);
 
-  // Initialize product placement when component mounts or updates
   useEffect(() => {
     const generateProductPlacement = () => {
       const newProductPlacement = [];
+      const slotWidth = 0.35; 
+      const margin = 0.05; 
 
       for (let shelf = 0; shelf < shelves; shelf++) {
         const shelfProducts = [];
-
-        // Randomly select a category for the shelf
         const category = productCategories[Math.floor(Math.random() * productCategories.length)];
+        
+        const totalSlotsWidth = slotsPerRow * slotWidth;
+        const remainingSpace = size.width - totalSlotsWidth;
+        const gap = remainingSpace / (slotsPerRow + 1);
+        
+        const shelfHeight = size.height / shelves;
+        const shelfY = shelf * shelfHeight + shelfHeight / 2;
 
-        // Calculate spacing between boxes
-        const boxSpacingX = size.width / (boxesPerRow + 1);
-
-        for (let row = 0; row < boxesPerRow; row++) {
-          // Randomly select a variant from the category
+        for (let row = 0; row < slotsPerRow; row++) {
           const variant = category.variants[Math.floor(Math.random() * category.variants.length)];
+          
+          const xPosition = -(size.width / 2) + gap + (row * (slotWidth + gap));
 
-          // Left side product placement
           shelfProducts.push({
             leftSide: {
               position: [
-                -(size.width / 2 - boxSpacingX * (row + 1)),
-                shelf * (size.height / shelves) + (size.height / shelves / 2),
-                -(size.depth / 2 + 0.2)
+                xPosition + slotWidth/2,
+                shelfY,
+                -(size.depth / 2)
               ],
-              rotation: 0  // Facing forward
+              rotation: 0
             },
-            // Right side product placement
             rightSide: {
               position: [
-                -(size.width / 2 - boxSpacingX * (row + 1)),
-                shelf * (size.height / shelves) + (size.height / shelves / 2),
-                size.depth / 2 + 0.2
+                xPosition + slotWidth/2,
+                shelfY,
+                size.depth / 2
               ],
-              rotation: Math.PI  // Facing backward
+              rotation: Math.PI
             },
             category,
             variant
@@ -121,20 +245,18 @@ const Rack = ({
     };
 
     generateProductPlacement();
-  }, [shelves, boxesPerRow, size]);
+  }, [shelves, slotsPerRow, size]);
 
-  // Keyboard controls for adding/removing boxes
   const handleKeyDown = (e) => {
     if (e.key === 'b' || e.key === 'B') {
-      if (e.shiftKey && boxesPerRow < 5) {
-        setBoxesPerRow(prev => prev + 1);
-      } else if (e.ctrlKey && boxesPerRow > 1) {
-        setBoxesPerRow(prev => prev - 1);
+      if (e.shiftKey && slotsPerRow < 5) {
+        setSlotsPerRow(prev => prev + 1);
+      } else if (e.ctrlKey && slotsPerRow > 1) {
+        setSlotsPerRow(prev => prev - 1);
       }
     }
   };
 
-  // Add event listener for keyboard controls
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
@@ -144,7 +266,7 @@ const Rack = ({
 
   return (
     <group position={position}>
-      {/* Rack Structure */}
+      {/* Main Rack Structure */}
       <Box 
         args={[size.width, size.height, size.depth]} 
         position={[0, size.height / 2, 0]}
@@ -152,43 +274,57 @@ const Rack = ({
         <meshStandardMaterial 
           color={color} 
           roughness={0.7}
-          metalness={0.3}
+          metalness={0.2}
         />
       </Box>
 
-      {/* Shelves */}
+      {/* Vertical Supports */}
+      {[...Array(2)].map((_, i) => (
+        <Box 
+          key={`vertical-support-${i}`}
+          args={[0.1, size.height, 0.1]}
+          position={[
+            (i === 0 ? -1 : 1) * (size.width / 2),
+            size.height / 2,
+            0
+          ]}
+        >
+          <meshStandardMaterial 
+            color={color} 
+            roughness={0.8}
+            metalness={0.3}
+          />
+        </Box>
+      ))}
+
+      {/* Shelf Dividers */}
       {[...Array(shelves - 1)].map((_, index) => (
         <Box 
           key={`shelf-${index}`}
-          args={[size.width, 0.05, size.depth]} 
+          args={[size.width - 0.1, 0.05, size.depth]} 
           position={[0, (index + 1) * (size.height / shelves), 0]}
         >
           <meshStandardMaterial 
             color={color} 
             roughness={0.8}
             metalness={0.2}
-            opacity={0.6}
-            transparent
           />
         </Box>
       ))}
 
-      {/* Product Boxes */}
+      {/* Product Slots */}
       <group>
         {productPlacement.map((shelfProducts, shelfIndex) => (
           <React.Fragment key={`shelf-${shelfIndex}`}>
-            {shelfProducts.map((product, boxIndex) => (
-              <React.Fragment key={`shelf${shelfIndex}-box${boxIndex}`}>
-                {/* Left Side Product Box */}
-                <ProductBox 
+            {shelfProducts.map((product, slotIndex) => (
+              <React.Fragment key={`shelf${shelfIndex}-slot${slotIndex}`}>
+                <ProductSlot 
                   position={product.leftSide.position}
                   rotation={product.leftSide.rotation}
                   category={product.category}
                   variant={product.variant}
                 />
-                
-                {/* Right Side Product Box */}
-                <ProductBox 
+                <ProductSlot 
                   position={product.rightSide.position}
                   rotation={product.rightSide.rotation}
                   category={product.category}
@@ -200,73 +336,14 @@ const Rack = ({
         ))}
       </group>
 
-      {/* Shelf Control Text */}
-      <Text
-        position={[size.width / 2 + 0.5, size.height / 2, 0]}
-        fontSize={0.2}
-        color={color}
-        anchorX="left"
-        anchorY="middle"
-      >
-        {`Shelves: ${shelves}`}
-      </Text>
-
-      {/* Boxes Control Text */}
-      <Text
-        position={[size.width / 2 + 0.5, size.height / 2 - 0.3, 0]}
-        fontSize={0.2}
-        color={color}
-        anchorX="left"
-        anchorY="middle"
-      >
-        {`Boxes/Row: ${boxesPerRow}`}
-      </Text>
-
-      {/* Shelf Controls */}
-      <group position={[size.width / 2 + 0.5, size.height / 2 + 0.5, 0]}>
-        {/* Add Shelf */}
-        <group onClick={(e) => {
-          e.stopPropagation();
-          if (shelves < 6) onUpdateShelves(shelves + 1);
-        }}>
-          <Box args={[0.3, 0.2, 0.1]}>
-            <meshStandardMaterial color="#4CAF50" roughness={0.5} metalness={0.2} />
-          </Box>
-          <Text 
-            position={[0, 0, 0.06]} 
-            scale={0.2}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-          >
-            +
-          </Text>
-        </group>
-
-        {/* Remove Shelf */}
-        {shelves > 1 && (
-          <group 
-            position={[0.4, 0, 0]} 
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdateShelves(shelves - 1);
-            }}
-          >
-            <Box args={[0.3, 0.2, 0.1]}>
-              <meshStandardMaterial color="#f44336" roughness={0.5} metalness={0.2} />
-            </Box>
-            <Text 
-              position={[0, 0, 0.06]} 
-              scale={0.2}
-              color="white"
-              anchorX="center"
-              anchorY="middle"
-            >
-              -
-            </Text>
-          </group>
-        )}
-      </group>
+      {/* Control Panel */}
+      <ControlPanel 
+        position={[0, size.height + 0.2, 0]}
+        shelves={shelves}
+        slotsPerRow={slotsPerRow}
+        onUpdateShelves={onUpdateShelves}
+        onUpdateSlots={setSlotsPerRow}
+      />
     </group>
   );
 };
