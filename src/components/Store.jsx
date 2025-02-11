@@ -4,12 +4,21 @@ import {
   OrbitControls, 
   PerspectiveCamera, 
   Environment,
-  AccumulativeShadows,
-  RandomizedLight,
-  Loader,
   Box
 } from '@react-three/drei';
 import Aisle from './Aisle';
+
+// Realistic color palette
+const colors = {
+  background: '#F5F5F5',
+  floor: '#E0E0E0',
+  walls: '#BDBDBD',
+  accent: [
+    '#616161',   // Dark Gray
+    '#424242',   // Darker Gray
+    '#212121',   // Almost Black
+  ]
+};
 
 const Store = () => {
   const [aisles, setAisles] = useState([
@@ -38,8 +47,8 @@ const Store = () => {
       width: '100vw', 
       height: '100vh', 
       position: 'relative',
-      background: 'linear-gradient(to bottom, #37474F, #263238)',
-      fontFamily: 'Arial, sans-serif'
+      background: colors.background,
+      fontFamily: 'Roboto, Arial, sans-serif'
     }}>
       {/* Controls Panel */}
       <div style={{
@@ -48,16 +57,15 @@ const Store = () => {
         left: '20px',
         zIndex: 1000,
         padding: '20px',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
         borderRadius: '12px',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        backdropFilter: 'blur(8px)'
+        boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+        backdropFilter: 'blur(10px)'
       }}>
         <h2 style={{ 
           margin: '0 0 15px 0',
-          color: '#37474F',
-          borderBottom: '2px solid #4CAF50',
+          color: colors.accent[0],
+          borderBottom: `2px solid ${colors.accent[1]}`,
           paddingBottom: '10px',
           fontSize: '1.5rem',
           fontWeight: '600'
@@ -69,7 +77,7 @@ const Store = () => {
             onClick={addAisle}
             style={{
               padding: '12px 24px',
-              backgroundColor: '#4CAF50',
+              backgroundColor: colors.accent[1],
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -77,7 +85,7 @@ const Store = () => {
               fontSize: '14px',
               fontWeight: '500',
               transition: 'all 0.3s ease',
-              boxShadow: '0 2px 8px rgba(76,175,80,0.3)'
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
             }}
             onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
             onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
@@ -89,7 +97,7 @@ const Store = () => {
               onClick={removeAisle}
               style={{
                 padding: '12px 24px',
-                backgroundColor: '#f44336',
+                backgroundColor: colors.accent[2],
                 color: 'white',
                 border: 'none',
                 borderRadius: '6px',
@@ -97,7 +105,7 @@ const Store = () => {
                 fontSize: '14px',
                 fontWeight: '500',
                 transition: 'all 0.3s ease',
-                boxShadow: '0 2px 8px rgba(244,67,54,0.3)'
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
               }}
               onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
               onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
@@ -109,32 +117,37 @@ const Store = () => {
         <div style={{ 
           marginTop: '20px', 
           fontSize: '14px', 
-          color: '#455A64',
+          color: colors.accent[0],
           lineHeight: '1.6'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#4CAF50' }}></div>
-            Click + or - above racks to modify shelves
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[1] }}></div>
+            Click rack to configure products
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#2196F3' }}></div>
-            Use buttons to add/remove racks in aisles
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[2] }}></div>
+            Use B+/B- to adjust product boxes
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#FFC107' }}></div>
+            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[0] }}></div>
             Drag to rotate, scroll to zoom
           </div>
         </div>
       </div>
 
       <Canvas 
-        shadows="soft"
         camera={{ position: [15, 15, 15], fov: 50 }}
-        style={{ background: 'linear-gradient(to bottom, #37474F, #263238)' }}
+        style={{ 
+          background: colors.background,
+          width: '100%', 
+          height: '100%' 
+        }}
+        gl={{ 
+          antialias: true,
+          powerPreference: 'high-performance'
+        }}
       >
         <Suspense fallback={null}>
-          <fog attach="fog" args={['#37474F', 30, 50]} />
-          
           <PerspectiveCamera makeDefault position={[15, 15, 15]} />
           <OrbitControls 
             target={[5, 0, 5]} 
@@ -143,90 +156,71 @@ const Store = () => {
             dampingFactor={0.05}
           />
           
-          {/* Environment and Lighting */}
-          <Environment preset="warehouse" background blur={0.8} />
-          
+          {/* Realistic Lighting */}
           <ambientLight intensity={0.4} />
           <directionalLight
             position={[10, 10, 5]}
-            intensity={0.8}
+            intensity={0.7}
             castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
+            shadow-mapSize-width={1024}
+            shadow-mapSize-height={1024}
           />
-          <spotLight
-            position={[-10, 10, -5]}
-            intensity={0.5}
-            angle={0.5}
-            penumbra={0.5}
-            castShadow
+          <pointLight 
+            position={[-10, 10, -10]} 
+            intensity={0.3} 
+            distance={50} 
           />
+
+          {/* Environment */}
+          <Environment preset="warehouse" background />
 
           {/* Floor */}
-          <group>
-            {/* Main Floor */}
-            <mesh 
-              rotation={[-Math.PI / 2, 0, 0]} 
-              position={[0, -0.5, 0]} 
-              receiveShadow
-            >
-              <planeGeometry args={[100, 100]} />
-              <meshPhysicalMaterial 
-                color="#455A64"
-                metalness={0.2}
-                roughness={0.8}
-                clearcoat={0.3}
-                clearcoatRoughness={0.3}
-                envMapIntensity={0.5}
-              />
-            </mesh>
-
-            {/* Floor Pattern */}
-            <gridHelper 
-              args={[100, 100, '#78909C', '#546E7A']} 
-              position={[0, -0.49, 0]}
+          <mesh 
+            rotation={[-Math.PI / 2, 0, 0]} 
+            position={[0, -0.5, 0]}
+            receiveShadow
+          >
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial 
+              color={colors.floor} 
+              roughness={0.8}
+              metalness={0.2}
             />
-          </group>
+          </mesh>
 
           {/* Walls */}
-          <Box args={[100, 20, 1]} position={[0, 9.5, -50]}>
-            <meshStandardMaterial color="#37474F" />
+          <Box args={[100, 20, 1]} position={[0, 9.5, -50]} receiveShadow>
+            <meshStandardMaterial 
+              color={colors.walls} 
+              roughness={0.7}
+              metalness={0.3}
+            />
           </Box>
-          <Box args={[1, 20, 100]} position={[-50, 9.5, 0]}>
-            <meshStandardMaterial color="#37474F" />
+          <Box args={[1, 20, 100]} position={[-50, 9.5, 0]} receiveShadow>
+            <meshStandardMaterial 
+              color={colors.walls} 
+              roughness={0.7}
+              metalness={0.3}
+            />
           </Box>
-          <Box args={[1, 20, 100]} position={[50, 9.5, 0]}>
-            <meshStandardMaterial color="#37474F" />
+          <Box args={[1, 20, 100]} position={[50, 9.5, 0]} receiveShadow>
+            <meshStandardMaterial 
+              color={colors.walls} 
+              roughness={0.7}
+              metalness={0.3}
+            />
           </Box>
 
           {/* Aisles */}
-          {aisles.map((aisle) => (
+          {aisles.map((aisle, index) => (
             <Aisle
               key={aisle.id}
               position={aisle.position}
               initialRackCount={3}
               rackSpacing={3}
+              accentColor={colors.accent[index % colors.accent.length]}
             />
           ))}
-
-          {/* Shadows */}
-          <AccumulativeShadows
-            temporal
-            frames={100}
-            alphaTest={0.85}
-            opacity={0.8}
-            scale={100}
-            position={[0, -0.49, 0]}
-          >
-            <RandomizedLight
-              amount={8}
-              radius={10}
-              ambient={0.5}
-              intensity={1}
-              position={[5, 5, -10]}
-              bias={0.001}
-            />
-          </AccumulativeShadows>
         </Suspense>
       </Canvas>
     </div>
