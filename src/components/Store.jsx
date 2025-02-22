@@ -1,10 +1,11 @@
-import React, { useState, Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { 
-  OrbitControls, 
-  PerspectiveCamera, 
+import React, { useState, useRef } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import {
+  OrbitControls,
+  PerspectiveCamera,
   Environment,
-  Box
+  Box,
+  Html
 } from '@react-three/drei';
 import Aisle from './Aisle';
 
@@ -22,30 +23,55 @@ const colors = {
 
 const Store = () => {
   const [aisles, setAisles] = useState([
-    { id: 0, position: [0, 0, 0] },
-    { id: 1, position: [0, 0, 5] },
+    { id: 0, position: [0, 0, 0], isNinetyDegree: false },
+    { id: 1, position: [0, 0, 5], isNinetyDegree: false },
   ]);
+  const [selectedAisle, setSelectedAisle] = useState(null);
+  const [isPlacingRegularAisle, setIsPlacingRegularAisle] = useState(false);
 
-  const addAisle = () => {
+  const addAisle = (point) => {
     setAisles(prevAisles => [
       ...prevAisles,
       {
         id: prevAisles.length,
-        position: [0, 0, (prevAisles.length) * 5]
+        position: [point.x, 0, point.z],
+        isNinetyDegree: false
       }
     ]);
+    setIsPlacingRegularAisle(false);
   };
 
-  const removeAisle = () => {
-    if (aisles.length > 1) {
-      setAisles(prevAisles => prevAisles.slice(0, -1));
+  const removeSelectedAisle = () => {
+    if (selectedAisle !== null) {
+      setAisles(prevAisles => prevAisles.filter(aisle => aisle.id !== selectedAisle));
+      setSelectedAisle(null);
     }
   };
 
+  const handlePlaneClick = (event) => {
+    if (isPlacingRegularAisle) {
+      const point = event.point;
+      setAisles(prevAisles => [
+        ...prevAisles,
+        {
+          id: prevAisles.length,
+          position: [point.x, 0, point.z],
+          isNinetyDegree: false
+        }
+      ]);
+      setIsPlacingRegularAisle(false);
+    }
+  };
+
+  const handleAisleClick = (event, aisleId) => {
+    event.stopPropagation();
+    setSelectedAisle(aisleId);
+  };
+
   return (
-    <div style={{ 
-      width: '100vw', 
-      height: '100vh', 
+    <div style={{
+      width: '100vw',
+      height: '100vh',
       position: 'relative',
       background: colors.background,
       fontFamily: 'Roboto, Arial, sans-serif'
@@ -62,7 +88,7 @@ const Store = () => {
         boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
         backdropFilter: 'blur(10px)'
       }}>
-        <h2 style={{ 
+        <h2 style={{
           margin: '0 0 15px 0',
           color: colors.accent[0],
           borderBottom: `2px solid ${colors.accent[1]}`,
@@ -72,12 +98,12 @@ const Store = () => {
         }}>
           Superstore Layout Designer
         </h2>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={addAisle}
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setIsPlacingRegularAisle(true)}
             style={{
               padding: '12px 24px',
-              backgroundColor: colors.accent[1],
+              backgroundColor: isPlacingRegularAisle ? '#4CAF50' : colors.accent[1],
               color: 'white',
               border: 'none',
               borderRadius: '6px',
@@ -90,39 +116,48 @@ const Store = () => {
             onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
             onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
           >
-            Add Aisle
+            {isPlacingRegularAisle ? 'Click to Place Regular Aisle' : 'Add Regular Aisle'}
           </button>
-          {aisles.length > 1 && (
-            <button 
-              onClick={removeAisle}
-              style={{
-                padding: '12px 24px',
-                backgroundColor: colors.accent[2],
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
-                transition: 'all 0.3s ease',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-              }}
-              onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-              onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-            >
-              Remove Aisle
-            </button>
-          )}
+          <button
+            onClick={removeSelectedAisle}
+            disabled={selectedAisle === null}
+            style={{
+              padding: '12px 24px',
+              backgroundColor: selectedAisle !== null ? '#f44336' : '#9e9e9e',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: selectedAisle !== null ? 'pointer' : 'not-allowed',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              opacity: selectedAisle !== null ? 1 : 0.7
+            }}
+            onMouseOver={(e) => selectedAisle !== null && (e.target.style.transform = 'translateY(-2px)')}
+            onMouseOut={(e) => selectedAisle !== null && (e.target.style.transform = 'translateY(0)')}
+          >
+            Delete Selected Aisle
+          </button>
         </div>
-        <div style={{ 
-          marginTop: '20px', 
-          fontSize: '14px', 
+        <div style={{
+          marginTop: '20px',
+          fontSize: '14px',
           color: colors.accent[0],
           lineHeight: '1.6'
         }}>
+          {isPlacingRegularAisle && (
+            <div style={{
+              color: '#4CAF50',
+              fontWeight: 'bold',
+              marginBottom: '10px'
+            }}>
+              Click anywhere on the floor to place the aisle
+            </div>
+          )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[1] }}></div>
-            Click rack to configure products
+            Click aisle to select/deselect
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[2] }}></div>
@@ -135,93 +170,98 @@ const Store = () => {
         </div>
       </div>
 
-      <Canvas 
+      <Canvas
         camera={{ position: [15, 15, 15], fov: 50 }}
-        style={{ 
+        style={{
           background: colors.background,
-          width: '100%', 
-          height: '100%' 
+          width: '100%',
+          height: '100%',
+          cursor: (isPlacingRegularAisle) ? 'crosshair' : 'default'
         }}
-        gl={{ 
+        gl={{
           antialias: true,
           powerPreference: 'high-performance'
         }}
       >
-        <Suspense fallback={null}>
-          <PerspectiveCamera makeDefault position={[15, 15, 15]} />
-          <OrbitControls 
-            target={[5, 0, 5]} 
-            maxPolarAngle={Math.PI / 2.1}
-            enableDamping
-            dampingFactor={0.05}
-          />
-          
-          {/* Realistic Lighting */}
-          <ambientLight intensity={0.4} />
-          <directionalLight
-            position={[10, 10, 5]}
-            intensity={0.7}
-            castShadow
-            shadow-mapSize-width={1024}
-            shadow-mapSize-height={1024}
-          />
-          <pointLight 
-            position={[-10, 10, -10]} 
-            intensity={0.3} 
-            distance={50} 
-          />
+        <PerspectiveCamera makeDefault position={[15, 15, 15]} />
+        <OrbitControls
+          target={[5, 0, 5]}
+          maxPolarAngle={Math.PI / 2.1}
+          enableDamping
+          dampingFactor={0.05}
+          enabled={!isPlacingRegularAisle}
+        />
 
-          {/* Environment */}
-          <Environment preset="warehouse" background />
+        {/* Realistic Lighting */}
+        <ambientLight intensity={0.4} />
+        <directionalLight
+          position={[10, 10, 5]}
+          intensity={0.7}
+          castShadow
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+        />
+        <pointLight
+          position={[-10, 10, -10]}
+          intensity={0.3}
+          distance={50}
+        />
 
-          {/* Floor */}
-          <mesh 
-            rotation={[-Math.PI / 2, 0, 0]} 
-            position={[0, -0.5, 0]}
-            receiveShadow
+        {/* Environment */}
+        <Environment preset="warehouse" background />
+
+        {/* Floor with click handler */}
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[0, -0.5, 0]}
+          receiveShadow
+          onClick={handlePlaneClick}
+        >
+          <planeGeometry args={[100, 100]} />
+          <meshStandardMaterial
+            color={colors.floor}
+            roughness={0.8}
+            metalness={0.2}
+          />
+        </mesh>
+
+        {/* Walls */}
+        <Box args={[100, 20, 1]} position={[0, 9.5, -50]} receiveShadow>
+          <meshStandardMaterial
+            color={colors.walls}
+            roughness={0.7}
+            metalness={0.3}
+          />
+        </Box>
+        <Box args={[1, 20, 100]} position={[-50, 9.5, 0]} receiveShadow>
+          <meshStandardMaterial
+            color={colors.walls}
+            roughness={0.7}
+            metalness={0.3}
+          />
+        </Box>
+        <Box args={[1, 20, 100]} position={[50, 9.5, 0]} receiveShadow>
+          <meshStandardMaterial
+            color={colors.walls}
+            roughness={0.7}
+            metalness={0.3}
+          />
+        </Box>
+
+        {/* Aisles */}
+        {aisles.map((aisle, index) => (
+          <group
+            key={aisle.id}
+            onClick={(e) => handleAisleClick(e, aisle.id)}
           >
-            <planeGeometry args={[100, 100]} />
-            <meshStandardMaterial 
-              color={colors.floor} 
-              roughness={0.8}
-              metalness={0.2}
-            />
-          </mesh>
-
-          {/* Walls */}
-          <Box args={[100, 20, 1]} position={[0, 9.5, -50]} receiveShadow>
-            <meshStandardMaterial 
-              color={colors.walls} 
-              roughness={0.7}
-              metalness={0.3}
-            />
-          </Box>
-          <Box args={[1, 20, 100]} position={[-50, 9.5, 0]} receiveShadow>
-            <meshStandardMaterial 
-              color={colors.walls} 
-              roughness={0.7}
-              metalness={0.3}
-            />
-          </Box>
-          <Box args={[1, 20, 100]} position={[50, 9.5, 0]} receiveShadow>
-            <meshStandardMaterial 
-              color={colors.walls} 
-              roughness={0.7}
-              metalness={0.3}
-            />
-          </Box>
-
-          {/* Aisles */}
-          {aisles.map((aisle, index) => (
             <Aisle
-              key={aisle.id}
               position={aisle.position}
               initialRackCount={3}
               rackSpacing={3}
-              accentColor={colors.accent[index % colors.accent.length]}
+              accentColor={selectedAisle === aisle.id ? '#4CAF50' : colors.accent[index % colors.accent.length]}
             />
-          ))}
-        </Suspense>
+          </group>
+        ))}
       </Canvas>
     </div>
   );
