@@ -23,8 +23,57 @@ const colors = {
 
 const Store = () => {
   const [aisles, setAisles] = useState([
-    { id: 0, position: [0, 0, 0], isNinetyDegree: false },
-    { id: 1, position: [0, 0, 5], isNinetyDegree: false },
+    { 
+      id: 0, 
+      position: [0, 0, 0], 
+      isNinetyDegree: false,
+      racks: Array.from({ length: 3 }, (_, index) => ({
+        id: `A0-R${index + 1}`,
+        position: [index * 3, 0, 0],
+        sides: {
+          left: {
+            id: `A0-R${index + 1}-L`,
+            shelvesCount: 4,
+            slotsPerShelf: [3, 3, 3, 3],
+            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+              id: `A0-R${index + 1}-L-SH${shelfIndex + 1}`,
+              slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                const slotId = `A0-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                return {
+                  id: slotId,
+                  productId: `P${Math.floor(Math.random() * 1000)}`,
+                  productName: `Product ${Math.floor(Math.random() * 100)}`,
+                  description: `Description for product in slot ${slotId}`,
+                  price: (Math.random() * 100).toFixed(2),
+                  quantity: Math.floor(Math.random() * 50)
+                };
+              })
+            }))
+          },
+          right: {
+            id: `A0-R${index + 1}-R`,
+            shelvesCount: 4,
+            slotsPerShelf: [3, 3, 3, 3],
+            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+              id: `A0-R${index + 1}-R-SH${shelfIndex + 1}`,
+              slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                const slotId = `A0-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                return {
+                  id: slotId,
+                  productId: `P${Math.floor(Math.random() * 1000)}`,
+                  productName: `Product ${Math.floor(Math.random() * 100)}`,
+                  description: `Description for product in slot ${slotId}`,
+                  price: (Math.random() * 100).toFixed(2),
+                  quantity: Math.floor(Math.random() * 50)
+                };
+              })
+            }))
+          }
+        },
+        size: { width: 2, depth: 1, height: 3 },
+        color: `hsl(${Math.random() * 360}, 70%, 60%)`
+      }))
+    }
   ]);
   const [selectedAisle, setSelectedAisle] = useState(null);
   const [isPlacingRegularAisle, setIsPlacingRegularAisle] = useState(false);
@@ -35,7 +84,53 @@ const Store = () => {
       {
         id: prevAisles.length,
         position: [point.x, 0, point.z],
-        isNinetyDegree: false
+        isNinetyDegree: false,
+        racks: Array.from({ length: 3 }, (_, index) => ({
+          id: `A${prevAisles.length}-R${index + 1}`,
+          position: [index * 3, 0, 0],
+          sides: {
+            left: {
+              id: `A${prevAisles.length}-R${index + 1}-L`,
+              shelvesCount: 4,
+              slotsPerShelf: [3, 3, 3, 3],
+              shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+                id: `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}`,
+                slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                  const slotId = `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                  return {
+                    id: slotId,
+                    productId: `P${Math.floor(Math.random() * 1000)}`,
+                    productName: `Product ${Math.floor(Math.random() * 100)}`,
+                    description: `Description for product in slot ${slotId}`,
+                    price: (Math.random() * 100).toFixed(2),
+                    quantity: Math.floor(Math.random() * 50)
+                  };
+                })
+              }))
+            },
+            right: {
+              id: `A${prevAisles.length}-R${index + 1}-R`,
+              shelvesCount: 4,
+              slotsPerShelf: [3, 3, 3, 3],
+              shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+                id: `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}`,
+                slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                  const slotId = `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                  return {
+                    id: slotId,
+                    productId: `P${Math.floor(Math.random() * 1000)}`,
+                    productName: `Product ${Math.floor(Math.random() * 100)}`,
+                    description: `Description for product in slot ${slotId}`,
+                    price: (Math.random() * 100).toFixed(2),
+                    quantity: Math.floor(Math.random() * 50)
+                  };
+                })
+              }))
+            }
+          },
+          size: { width: 2, depth: 1, height: 3 },
+          color: `hsl(${Math.random() * 360}, 70%, 60%)`
+        }))
       }
     ]);
     setIsPlacingRegularAisle(false);
@@ -48,6 +143,25 @@ const Store = () => {
     }
   };
 
+  const updateRackData = (aisleId, rackData) => {
+    setAisles(prevAisles => 
+      prevAisles.map(aisle => 
+        aisle.id === aisleId 
+          ? {
+              ...aisle,
+              racks: aisle.racks.map(rack => 
+                rack.id === rackData.id 
+                  ? { ...rack, sides: rackData.sides }
+                  : rack
+              )
+            }
+          : aisle
+      )
+    );
+  };
+
+  console.log(aisles);
+
   const handlePlaneClick = (event) => {
     if (isPlacingRegularAisle) {
       const point = event.point;
@@ -56,7 +170,53 @@ const Store = () => {
         {
           id: prevAisles.length,
           position: [point.x, 0, point.z],
-          isNinetyDegree: false
+          isNinetyDegree: false,
+          racks: Array.from({ length: 3 }, (_, index) => ({
+            id: `A${prevAisles.length}-R${index + 1}`,
+            position: [index * 3, 0, 0],
+            sides: {
+              left: {
+                id: `A${prevAisles.length}-R${index + 1}-L`,
+                shelvesCount: 4,
+                slotsPerShelf: [3, 3, 3, 3],
+                shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+                  id: `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}`,
+                  slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                    const slotId = `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                    return {
+                      id: slotId,
+                      productId: `P${Math.floor(Math.random() * 1000)}`,
+                      productName: `Product ${Math.floor(Math.random() * 100)}`,
+                      description: `Description for product in slot ${slotId}`,
+                      price: (Math.random() * 100).toFixed(2),
+                      quantity: Math.floor(Math.random() * 50)
+                    };
+                  })
+                }))
+              },
+              right: {
+                id: `A${prevAisles.length}-R${index + 1}-R`,
+                shelvesCount: 4,
+                slotsPerShelf: [3, 3, 3, 3],
+                shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+                  id: `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}`,
+                  slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                    const slotId = `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                    return {
+                      id: slotId,
+                      productId: `P${Math.floor(Math.random() * 1000)}`,
+                      productName: `Product ${Math.floor(Math.random() * 100)}`,
+                      description: `Description for product in slot ${slotId}`,
+                      price: (Math.random() * 100).toFixed(2),
+                      quantity: Math.floor(Math.random() * 50)
+                    };
+                  })
+                }))
+              }
+            },
+            size: { width: 2, depth: 1, height: 3 },
+            color: `hsl(${Math.random() * 360}, 70%, 60%)`
+          }))
         }
       ]);
       setIsPlacingRegularAisle(false);
@@ -259,6 +419,9 @@ const Store = () => {
               initialRackCount={3}
               rackSpacing={3}
               accentColor={selectedAisle === aisle.id ? '#4CAF50' : colors.accent[index % colors.accent.length]}
+              aisleId={aisle.id}
+              racks={aisle.racks}
+              onRackUpdate={(data) => updateRackData(aisle.id, data)}
             />
           </group>
         ))}

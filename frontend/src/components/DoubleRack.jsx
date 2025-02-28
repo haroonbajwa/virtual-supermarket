@@ -21,13 +21,12 @@ const ControlButton = ({ position, label, onClick, color = '#4CAF50' }) => (
 );
 
 // Individual Slot Component
-const Slot = ({ position, size, color, title = "Product", description = "Description" }) => {
+const Slot = ({ position, size, color, title = "Product", description = "Description", slotId }) => {
   return (
     <group position={position}>
       <Box args={[size.width, size.height, size.depth]}>
         <meshStandardMaterial color={color} />
       </Box>
-      {/* Title text */}
       <Text
         position={[0, size.height / 2 - 0.1, size.depth / 2]}
         fontSize={0.07}
@@ -35,54 +34,65 @@ const Slot = ({ position, size, color, title = "Product", description = "Descrip
         anchorX="center"
         anchorY="bottom"
       >
-        {title}
+        {`${title} (${slotId})`}
       </Text>
     </group>
   );
 };
 
 // Shelf Component (Group of Slots)
-const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotColors }) => {
-  // Calculate slot width to fill entire shelf width
-  const slotWidth = width / slotsCount;
+const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotColors, shelfId }) => {
   const slots = [];
-
-  // Start from left edge and build right
   const startX = -width / 2;
+  const slotWidth = width / slotsCount;
+
+  const shelfData = {
+    id: shelfId,
+    slots: []
+  };
 
   for (let i = 0; i < slotsCount; i++) {
+    const slotId = `${shelfId}-S${i + 1}`;
     const slotPosition = [
-      startX + (i * slotWidth) + (slotWidth / 2), // Position from left to right
+      startX + (i * slotWidth) + (slotWidth / 2),
       position[1],
       position[2]
     ];
+
+    shelfData.slots.push({
+      id: slotId,
+      position: slotPosition
+    });
 
     slots.push(
       <Slot
         key={`slot-${i}`}
         position={slotPosition}
         size={{
-          width: slotWidth - 0.05, // Small gap between slots
+          width: slotWidth - 0.05,
           height: height - 0.05,
           depth: depth - 0.05
         }}
         color={slotColors[i % slotColors.length]}
-        title={`Product ${i + 1}`}
-        description={`Description for product ${i + 1}`}
+        title={`Slot ${i + 1}`}
+        description={`Description for slot ${i + 1}`}
+        slotId={slotId}
       />
     );
   }
 
+  useEffect(() => {
+    //console.log('Shelf Data:', shelfData);
+  }, []);
+
   return (
     <group>
-      {/* Shelf Base */}
       <Box
         args={[width, 0.05, depth]}
-        position={[position[0], position[1] - height / 2, position[2]]} // Move shelf base 50% down
+        position={[position[0], position[1] - height / 2, position[2]]}
       >
         <meshStandardMaterial
           color={shelfColor}
-          //transparent={true}
           opacity={1}
           roughness={0.7}
           metalness={0.3}
@@ -103,24 +113,34 @@ const RackSide = ({
   slotColors,
   isRightSide,
   onShelfSelect,
-  selectedShelfIndex
+  selectedShelfIndex,
+  rackId,
+  side
 }) => {
   const shelves = [];
-
-  // Calculate shelf height to fill entire space
   const shelfHeight = size.height / shelvesCount;
-  // Start from bottom (0) and build up
   const startY = 0;
-
-  // Calculate rotation for left side (180 degrees = Math.PI)
   const rotation = isRightSide ? [0, 0, 0] : [0, Math.PI, 0];
 
+  const sideData = {
+    id: `${rackId}-${side}`,
+    side: side,
+    shelves: []
+  };
+
   for (let i = 0; i < shelvesCount; i++) {
+    const shelfId = `${rackId}-${side}-SH${i + 1}`;
     const shelfPosition = [
       position[0],
-      startY + (i * shelfHeight) + (shelfHeight / 2), // Position from bottom up
+      startY + (i * shelfHeight) + (shelfHeight / 2),
       position[2]
     ];
+
+    sideData.shelves.push({
+      id: shelfId,
+      position: shelfPosition,
+      slotsCount: slotsPerShelf[i]
+    });
 
     shelves.push(
       <group
@@ -133,15 +153,20 @@ const RackSide = ({
         <Shelf
           position={shelfPosition}
           width={size.width - 0.2}
-          height={shelfHeight - 0.1} // Small gap between shelves
+          height={shelfHeight - 0.1}
           depth={size.depth / 2 - 0.1}
           slotsCount={slotsPerShelf[i]}
           shelfColor={i === selectedShelfIndex ? '#f39c12' : shelfColors[i % shelfColors.length]}
           slotColors={slotColors}
+          shelfId={shelfId}
         />
       </group>
     );
   }
+
+  useEffect(() => {
+    //console.log('Rack Side Data:', sideData);
+  }, []);
 
   return (
     <group
@@ -156,7 +181,9 @@ const RackSide = ({
 const DoubleRack = ({
   position = [0, 0, 0],
   size = { width: 3, height: 4, depth: 1 },
-  color = '#34495e'
+  color = '#34495e',
+  rackId,
+  onUpdate
 }) => {
   const [currentPosition, setCurrentPosition] = useState(position);
   const [currentRotation, setCurrentRotation] = useState(0);
@@ -164,8 +191,31 @@ const DoubleRack = ({
   const [leftShelves, setLeftShelves] = useState(4);
   const [rightShelves, setRightShelves] = useState(4);
   const [selectedShelf, setSelectedShelf] = useState({ side: null, index: -1 });
-  const [leftSlotsPerShelf, setLeftSlotsPerShelf] = useState([3, 3, 3, 3, 3, 3]);
-  const [rightSlotsPerShelf, setRightSlotsPerShelf] = useState([3, 3, 3, 3, 3, 3]);
+  const [leftSlotsPerShelf, setLeftSlotsPerShelf] = useState([3, 3, 3, 3]);
+  const [rightSlotsPerShelf, setRightSlotsPerShelf] = useState([3, 3, 3, 3]);
+
+  const rackData = {
+    id: rackId,
+    position: currentPosition,
+    rotation: currentRotation,
+    sides: {
+      left: {
+        shelvesCount: leftShelves,
+        slotsPerShelf: leftSlotsPerShelf
+      },
+      right: {
+        shelvesCount: rightShelves,
+        slotsPerShelf: rightSlotsPerShelf
+      }
+    }
+  };
+
+  useEffect(() => {
+    console.log('Double Rack Data:', rackData);
+    if (onUpdate) {
+      onUpdate(rackData);
+    }
+  }, [leftShelves, rightShelves, leftSlotsPerShelf, rightSlotsPerShelf]);
 
   // Handle keyboard movement when rack is selected
   useEffect(() => {
@@ -247,14 +297,18 @@ const DoubleRack = ({
     if (side === 'left') {
       if (action === 'add' && leftShelves < 6) {
         setLeftShelves(prev => prev + 1);
+        setLeftSlotsPerShelf(prev => [...prev, 3]);
       } else if (action === 'remove' && leftShelves > 1) {
         setLeftShelves(prev => prev - 1);
+        setLeftSlotsPerShelf(prev => prev.slice(0, -1));
       }
     } else {
       if (action === 'add' && rightShelves < 6) {
         setRightShelves(prev => prev + 1);
+        setRightSlotsPerShelf(prev => [...prev, 3]);
       } else if (action === 'remove' && rightShelves > 1) {
         setRightShelves(prev => prev - 1);
+        setRightSlotsPerShelf(prev => prev.slice(0, -1));
       }
     }
   };
@@ -377,6 +431,8 @@ const DoubleRack = ({
         isRightSide={false}
         onShelfSelect={(index) => handleShelfSelect('left', index)}
         selectedShelfIndex={selectedShelf.side === 'left' ? selectedShelf.index : -1}
+        rackId={rackId}
+        side="L"
       />
 
       {/* Right Side */}
@@ -390,6 +446,8 @@ const DoubleRack = ({
         isRightSide={true}
         onShelfSelect={(index) => handleShelfSelect('right', index)}
         selectedShelfIndex={selectedShelf.side === 'right' ? selectedShelf.index : -1}
+        rackId={rackId}
+        side="R"
       />
 
       {/* Control Panel on Top */}

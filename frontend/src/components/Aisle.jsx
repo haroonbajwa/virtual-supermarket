@@ -22,53 +22,97 @@ const ControlButton = ({ position, label, onClick, color = '#4CAF50' }) => (
   </group>
 );
 
+const generateRackData = (rackId) => {
+  return {
+    id: rackId,
+    position: [0, 0, 0],
+    sides: {
+      left: {
+        id: `${rackId}-L`,
+        shelvesCount: 4,
+        slotsPerShelf: [3, 3, 3, 3],
+        shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+          id: `${rackId}-L-SH${shelfIndex + 1}`,
+          slots: Array.from({ length: 3 }, (_, slotIndex) => {
+            const slotId = `${rackId}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+            return {
+              id: slotId,
+              productId: `P${Math.floor(Math.random() * 1000)}`,
+              productName: `Product ${Math.floor(Math.random() * 100)}`,
+              description: `Description for product in slot ${slotId}`,
+              price: (Math.random() * 100).toFixed(2),
+              quantity: Math.floor(Math.random() * 50)
+            };
+          })
+        }))
+      },
+      right: {
+        id: `${rackId}-R`,
+        shelvesCount: 4,
+        slotsPerShelf: [3, 3, 3, 3],
+        shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+          id: `${rackId}-R-SH${shelfIndex + 1}`,
+          slots: Array.from({ length: 3 }, (_, slotIndex) => {
+            const slotId = `${rackId}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+            return {
+              id: slotId,
+              productId: `P${Math.floor(Math.random() * 1000)}`,
+              productName: `Product ${Math.floor(Math.random() * 100)}`,
+              description: `Description for product in slot ${slotId}`,
+              price: (Math.random() * 100).toFixed(2),
+              quantity: Math.floor(Math.random() * 50)
+            };
+          })
+        }))
+      }
+    }
+  };
+};
+
 const Aisle = ({ 
   position, 
   initialRackCount = 2, 
   rackSpacing = 2, 
-  accentColor = '#64B5F6' 
+  accentColor = '#64B5F6',
+  aisleId,
+  racks,
+  onRackUpdate
 }) => {
-  const [racks, setRacks] = useState(
-    Array.from({ length: initialRackCount }, (_, index) => ({
-      id: index,
-      shelves: 3,
-      size: { width: 2, depth: 1, height: 3 },
-      color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-      type: 'double' // 'double', 'singlesiderack'
-    }))
-  );
+  const [currentRacks, setCurrentRacks] = useState(racks || Array.from({ length: initialRackCount }, (_, index) => ({
+    ...generateRackData(`R${index + 1}`),
+    position: [index * rackSpacing, 0, 0],
+    size: { width: 2, depth: 1, height: 3 },
+    color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+    type: 'double'
+  })));
 
   const [currentPosition, setCurrentPosition] = useState(position);
   const [isSelected, setIsSelected] = useState(false);
   const [currentRotation, setCurrentRotation] = useState(0);
 
   const addRack = (type = 'double') => {
-    setRacks(prevRacks => [
-      ...prevRacks, 
-      { 
-        id: prevRacks.length, 
-        shelves: 3,
+    setCurrentRacks(prevRacks => {
+      const newRackId = `R${prevRacks.length + 1}`;
+      return [...prevRacks, {
+        ...generateRackData(newRackId),
+        position: [prevRacks.length * rackSpacing, 0, 0],
         size: { width: 2, depth: 1, height: 3 },
         color: `hsl(${Math.random() * 360}, 70%, 60%)`,
         type
-      }
-    ]);
+      }];
+    });
   };
 
   const removeRack = () => {
-    if (racks.length > 1) {
-      setRacks(prevRacks => prevRacks.slice(0, -1));
+    if (currentRacks.length > 1) {
+      setCurrentRacks(prevRacks => prevRacks.slice(0, -1));
     }
   };
 
-  const updateRackShelves = (rackIndex, newShelfCount) => {
-    setRacks(prevRacks => 
-      prevRacks.map((rack, index) => 
-        index === rackIndex 
-          ? { ...rack, shelves: newShelfCount }
-          : rack
-      )
-    );
+  const handleRackChange = (rackData) => {
+    if (onRackUpdate) {
+      onRackUpdate(rackData);
+    }
   };
 
   // Handle keyboard movement when aisle is selected
@@ -105,7 +149,7 @@ const Aisle = ({
   return (
     <group position={currentPosition} rotation={[0, currentRotation, 0]}>
       {/* Selection Button and Movement Controls */}
-      <group position={[racks.length * rackSpacing / 2, 5, 0]}>
+      <group position={[currentRacks.length * rackSpacing / 2, 5, 0]}>
         {/* Selection Button */}
         <group position={[0, 0.8, 0]}>
           <Box
@@ -167,7 +211,7 @@ const Aisle = ({
       </group>
 
       {/* Aisle Number */}
-      <group position={[racks.length * rackSpacing / 2, 4.3, 0]}>
+      <group position={[currentRacks.length * rackSpacing / 2, 4.3, 0]}>
         <Box 
           args={[1.5, 0.8, 0.1]} 
           position={[0, 0, -0.05]}
@@ -189,9 +233,9 @@ const Aisle = ({
       {/* Floor Marking */}
       <mesh 
         rotation={[-Math.PI / 2, 0, 0]} 
-        position={[racks.length * rackSpacing / 2, -0.48, 0]}
+        position={[currentRacks.length * rackSpacing / 2, -0.48, 0]}
       >
-        <planeGeometry args={[racks.length * rackSpacing + 2, 3]} />
+        <planeGeometry args={[currentRacks.length * rackSpacing + 2, 3]} />
         <meshBasicMaterial 
           color={accentColor}
           opacity={0.2}
@@ -201,27 +245,22 @@ const Aisle = ({
 
       {/* Racks */}
       <group>
-        {racks.map((rack, index) => {
-          const rackProps = {
-            key: rack.id,
-            position: [index * rackSpacing, 0, 0],
-            size: rack.size,
-            shelves: rack.shelves,
-            color: rack.color,
-            onUpdateShelves: (newShelfCount) => updateRackShelves(index, newShelfCount)
-          };
-
-          switch (rack.type) {
-            case 'singlesiderack':
-              return <SingleSideRack {...rackProps} />;
-            default:
-              return <DoubleRack {...rackProps} />;
-          }
-        })}
+        {currentRacks.map((rack, index) => (
+          <group key={rack.id} position={[index * rackSpacing, 0, 0]}>
+            <DoubleRack
+              position={[0, 0, 0]}
+              size={rack.size}
+              color={rack.color}
+              rackId={rack.id}
+              sides={rack.sides}
+              onUpdate={handleRackChange}
+            />
+          </group>
+        ))}
       </group>
 
       {/* Rack Controls */}
-      <group position={[racks.length * rackSpacing + 1, 2, 0]}>
+      <group position={[currentRacks.length * rackSpacing + 1, 2, 0]}>
         {/* Add Double-Sided Rack Button */}
         <group position={[-0.5, 0, 0]} onClick={(e) => {
           e.stopPropagation();
@@ -261,7 +300,7 @@ const Aisle = ({
         </group>
 
         {/* Remove Rack Button */}
-        {racks.length > 1 && (
+        {currentRacks.length > 1 && (
           <group position={[0.3, -0.4, 0]} onClick={(e) => {
             e.stopPropagation();
             removeRack();
