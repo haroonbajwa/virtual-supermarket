@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from '@react-three/drei';
 import { moveRack, rotateRack } from '../utils/Movement';
+import SlotForm from './SlotForm';
 
 // Control Button Component
-const ControlButton = ({ position, label, onClick, color = '#4CAF50' }) => (
+const ControlButton = ({ position, label, onClick, color = '#4CAF50', labelColor = 'white' }) => (
   <group position={position} onClick={onClick}>
-    <Box args={[0.3, 0.3, 0.1]}>
+    <Box args={[0.35, 0.3, 0.1]}>
       <meshStandardMaterial color={color} />
     </Box>
     <Text
       position={[0, 0, 0.06]}
       fontSize={0.1}
-      color="white"
+      color={labelColor}
       anchorX="center"
       anchorY="middle"
     >
@@ -21,50 +22,160 @@ const ControlButton = ({ position, label, onClick, color = '#4CAF50' }) => (
 );
 
 // Individual Slot Component
-const Slot = ({ position, size, color, title = "Product", description = "Description", slotId }) => {
+const Slot = ({ position, size, color, slotData, onUpdate }) => {
+  const [showForm, setShowForm] = useState(false);
+  const [lastClickTime, setLastClickTime] = useState(0);
+  const [isSelected, setIsSelected] = useState(false);
+
+  const handleClick = (event) => {
+    event.stopPropagation();
+    const currentTime = new Date().getTime();
+    const timeDiff = currentTime - lastClickTime;
+
+    if (timeDiff < 300) {  // Double click threshold of 300ms
+      setShowForm(true);
+      setIsSelected(false);
+    } else {
+      setIsSelected(!isSelected);
+    }
+
+    setLastClickTime(currentTime);
+  };
+
+  const handleSlotSave = (updatedSlot) => {
+    if (onUpdate) {
+      onUpdate(updatedSlot);
+    }
+    setShowForm(false);
+  };
+
   return (
-    <group position={position}>
+    <group position={position} onClick={handleClick}>
+      {/* Main slot with projector effect */}
       <Box args={[size.width, size.height, size.depth]}>
-        <meshStandardMaterial color={color} />
+        <meshStandardMaterial 
+          color={isSelected ? '#4CAF50' : color} 
+          emissive={isSelected ? '#4CAF50' : '#000000'}
+          emissiveIntensity={isSelected ? 0.3 : 0}
+        />
       </Box>
       <Text
-        position={[0, size.height / 2 - 0.1, size.depth / 2]}
-        fontSize={0.07}
+        position={[0, size.height / 2 + 0.1, size.depth / 2]}
+        fontSize={0.1}
         color="black"
         anchorX="center"
         anchorY="bottom"
       >
-        {`${title} (${slotId})`}
+        {`${slotData.productName} (${slotData.id})`}
       </Text>
+
+      {/* Projection effect when selected */}
+      {isSelected && (
+        <>
+          {/* Light beam effect */}
+          <mesh position={[0, 0, size.depth]}>
+            <planeGeometry args={[size.width * 2, size.height * 2]} />
+            <meshBasicMaterial color="#4CAF50" transparent opacity={0.05} />
+          </mesh>
+
+          {/* Projected info panel */}
+          <group position={[0, 0, size.depth * 2]}>
+            {/* Background panel with projection effect */}
+            <Box args={[2, 1.2, 0.01]} position={[0, 0, 0]}>
+              <meshStandardMaterial 
+                color="#ffffff" 
+                transparent 
+                opacity={0.8}
+                emissive="#ffffff"
+                emissiveIntensity={0.2}
+              />
+            </Box>
+            
+            {/* Product info with hologram-like effect */}
+            <Text
+              position={[0, 0.4, 0.02]}
+              fontSize={0.15}
+              color="#4CAF50"
+              anchorX="center"
+              anchorY="center"
+              fontWeight="bold"
+            >
+              {slotData.productName}
+            </Text>
+
+            <Text
+              position={[0, 0.1, 0.02]}
+              fontSize={0.12}
+              color="#333333"
+              anchorX="center"
+              anchorY="center"
+            >
+              {`ID: ${slotData.productId}`}
+            </Text>
+            <Text
+              position={[0, -0.15, 0.02]}
+              fontSize={0.12}
+              color="#333333"
+              anchorX="center"
+              anchorY="center"
+            >
+              {`Price: $${slotData.price}`}
+            </Text>
+            <Text
+              position={[0, -0.4, 0.02]}
+              fontSize={0.12}
+              color="#333333"
+              anchorX="center"
+              anchorY="center"
+            >
+              {`Stock: ${slotData.quantity} units`}
+            </Text>
+          </group>
+        </>
+      )}
+
+      {showForm && (
+        <SlotForm
+          slot={slotData}
+          onSave={handleSlotSave}
+          onClose={() => setShowForm(false)}
+        />
+      )}
     </group>
   );
 };
 
 // Shelf Component (Group of Slots)
-const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotColors, shelfId }) => {
-  const slots = [];
+const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotColors, shelfId, slots, onSlotUpdate }) => {
+  const slotComponents = [];
   const startX = -width / 2;
   const slotWidth = width / slotsCount;
 
-  const shelfData = {
-    id: shelfId,
-    slots: []
+  const handleSlotUpdate = (updatedSlot) => {
+    if (onSlotUpdate) {
+      onSlotUpdate(updatedSlot);
+    }
   };
 
   for (let i = 0; i < slotsCount; i++) {
-    const slotId = `${shelfId}-S${i + 1}`;
     const slotPosition = [
       startX + (i * slotWidth) + (slotWidth / 2),
       position[1],
       position[2]
     ];
 
-    shelfData.slots.push({
-      id: slotId,
-      position: slotPosition
-    });
+    const defaultSlotData = {
+      id: `${shelfId}-S${i + 1}`,
+      productId: 'P484',
+      productName: `Product ${i + 1}`,
+      description: `Description for product in ${shelfId}-S${i + 1}`,
+      price: '68.78',
+      quantity: 49
+    };
 
-    slots.push(
+    const slotData = slots?.[i] || defaultSlotData;
+
+    slotComponents.push(
       <Slot
         key={`slot-${i}`}
         position={slotPosition}
@@ -74,16 +185,11 @@ const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotCol
           depth: depth - 0.05
         }}
         color={slotColors[i % slotColors.length]}
-        title={`Slot ${i + 1}`}
-        description={`Description for slot ${i + 1}`}
-        slotId={slotId}
+        slotData={slotData}
+        onUpdate={handleSlotUpdate}
       />
     );
   }
-
-  useEffect(() => {
-    //console.log('Shelf Data:', shelfData);
-  }, []);
 
   return (
     <group>
@@ -93,12 +199,11 @@ const Shelf = ({ position, width, height, depth, slotsCount, shelfColor, slotCol
       >
         <meshStandardMaterial
           color={shelfColor}
-          opacity={1}
           roughness={0.7}
           metalness={0.3}
         />
       </Box>
-      {slots}
+      {slotComponents}
     </group>
   );
 };
@@ -115,17 +220,19 @@ const RackSide = ({
   onShelfSelect,
   selectedShelfIndex,
   rackId,
-  side
+  shelves,
+  side,
+  onSlotUpdate
 }) => {
-  const shelves = [];
+  const shelfComponents = [];
   const shelfHeight = size.height / shelvesCount;
   const startY = 0;
   const rotation = isRightSide ? [0, 0, 0] : [0, Math.PI, 0];
 
-  const sideData = {
-    id: `${rackId}-${side}`,
-    side: side,
-    shelves: []
+  const handleSlotUpdate = (updatedSlot) => {
+    if (onSlotUpdate) {
+      onSlotUpdate(updatedSlot);
+    }
   };
 
   for (let i = 0; i < shelvesCount; i++) {
@@ -136,13 +243,21 @@ const RackSide = ({
       position[2]
     ];
 
-    sideData.shelves.push({
+    const defaultShelf = {
       id: shelfId,
-      position: shelfPosition,
-      slotsCount: slotsPerShelf[i]
-    });
+      slots: Array(slotsPerShelf[i]).fill().map((_, slotIndex) => ({
+        id: `${shelfId}-S${slotIndex + 1}`,
+        productId: 'P484',
+        productName: `Product ${slotIndex + 1}`,
+        description: `Description for product in ${shelfId}-S${slotIndex + 1}`,
+        price: '68.78',
+        quantity: 49
+      }))
+    };
 
-    shelves.push(
+    const currentShelf = shelves?.[i] || defaultShelf;
+
+    shelfComponents.push(
       <group
         key={`shelf-${i}`}
         onClick={(e) => {
@@ -159,21 +274,19 @@ const RackSide = ({
           shelfColor={i === selectedShelfIndex ? '#f39c12' : shelfColors[i % shelfColors.length]}
           slotColors={slotColors}
           shelfId={shelfId}
+          slots={currentShelf.slots}
+          onSlotUpdate={handleSlotUpdate}
         />
       </group>
     );
   }
-
-  useEffect(() => {
-    //console.log('Rack Side Data:', sideData);
-  }, []);
 
   return (
     <group
       position={[0, 0, isRightSide ? size.depth / 4 : -size.depth / 4]}
       rotation={rotation}
     >
-      {shelves}
+      {shelfComponents}
     </group>
   );
 };
@@ -183,39 +296,113 @@ const DoubleRack = ({
   size = { width: 3, height: 4, depth: 1 },
   color = '#34495e',
   rackId,
+  sides,
   onUpdate
 }) => {
   const [currentPosition, setCurrentPosition] = useState(position);
   const [currentRotation, setCurrentRotation] = useState(0);
   const [isSelected, setIsSelected] = useState(false);
-  const [leftShelves, setLeftShelves] = useState(4);
-  const [rightShelves, setRightShelves] = useState(4);
   const [selectedShelf, setSelectedShelf] = useState({ side: null, index: -1 });
-  const [leftSlotsPerShelf, setLeftSlotsPerShelf] = useState([3, 3, 3, 3]);
-  const [rightSlotsPerShelf, setRightSlotsPerShelf] = useState([3, 3, 3, 3]);
+  const [hiddenSide, setHiddenSide] = useState(null); // null, 'left', or 'right'
+  const [rackDegree, setRackDegree] = useState(360);
 
-  const rackData = {
-    id: rackId,
-    position: currentPosition,
-    rotation: currentRotation,
-    sides: {
-      left: {
-        shelvesCount: leftShelves,
-        slotsPerShelf: leftSlotsPerShelf
-      },
-      right: {
-        shelvesCount: rightShelves,
-        slotsPerShelf: rightSlotsPerShelf
-      }
+  // Simple plane component
+  const SimplePlane = ({ side }) => (
+    <mesh position={[0, size.height / 2, side === 'right' ? size.depth / 4 : -size.depth / 4]}>
+      <planeGeometry args={[size.width, size.height]} />
+      <meshStandardMaterial color={color} side={2} opacity={0.7} transparent />
+    </mesh>
+  );
+
+  const handleShelfChange = (side, action) => {
+    const newSides = { ...sides };
+    const targetSide = side === 'left' ? newSides.left : newSides.right;
+
+    if (action === 'add' && targetSide.shelves.length < 6) {
+      targetSide.shelves.push({
+        id: `${rackId}-${side}-SH${targetSide.shelves.length + 1}`,
+        slots: Array(3).fill().map((_, i) => ({
+          id: `${rackId}-${side}-SH${targetSide.shelves.length + 1}-S${i + 1}`,
+          productId: '',
+          productName: `Product ${i + 1}`,
+          description: `Description for slot ${i + 1}`,
+          price: '',
+          quantity: 0
+        }))
+      });
+      targetSide.shelvesCount = targetSide.shelves.length;
+      targetSide.slotsPerShelf = targetSide.shelves.map(shelf => shelf.slots.length);
+    } else if (action === 'remove' && targetSide.shelves.length > 1) {
+      targetSide.shelves.pop();
+      targetSide.shelvesCount = targetSide.shelves.length;
+      targetSide.slotsPerShelf = targetSide.shelves.map(shelf => shelf.slots.length);
+    }
+
+    if (onUpdate) {
+      onUpdate({
+        id: rackId,
+        position: currentPosition,
+        rotation: currentRotation,
+        sides: newSides
+      });
     }
   };
 
-  useEffect(() => {
-    console.log('Double Rack Data:', rackData);
-    if (onUpdate) {
-      onUpdate(rackData);
+  const handleSlotChange = (action) => {
+    if (!selectedShelf.side) return;
+
+    const newSides = { ...sides };
+    const targetSide = selectedShelf.side === 'left' ? newSides.left : newSides.right;
+    const targetShelf = targetSide.shelves[selectedShelf.index];
+
+    if (!targetShelf) return;
+
+    if (action === 'add' && targetShelf.slots.length < 6) {
+      const newSlotId = `${targetShelf.id}-S${targetShelf.slots.length + 1}`;
+      targetShelf.slots.push({
+        id: newSlotId,
+        productId: '',
+        productName: `Product ${targetShelf.slots.length + 1}`,
+        description: `Description for slot ${targetShelf.slots.length + 1}`,
+        price: '',
+        quantity: 0
+      });
+      targetSide.slotsPerShelf = targetSide.shelves.map(shelf => shelf.slots.length);
+    } else if (action === 'remove' && targetShelf.slots.length > 1) {
+      targetShelf.slots.pop();
+      targetSide.slotsPerShelf = targetSide.shelves.map(shelf => shelf.slots.length);
     }
-  }, [leftShelves, rightShelves, leftSlotsPerShelf, rightSlotsPerShelf]);
+
+    if (onUpdate) {
+      onUpdate({
+        id: rackId,
+        position: currentPosition,
+        rotation: currentRotation,
+        sides: newSides
+      });
+    }
+  };
+
+  const handleSlotUpdate = (updatedSlot) => {
+    if (onUpdate) {
+      // Log the data being updated
+      console.log('Updating slot in DoubleRack:', {
+        id: rackId,
+        updatedSlot: {
+          ...updatedSlot,
+          id: updatedSlot.id // Ensure ID is preserved
+        }
+      });
+      
+      onUpdate({
+        id: rackId,
+        updatedSlot: {
+          ...updatedSlot,
+          id: updatedSlot.id // Ensure ID is preserved
+        }
+      });
+    }
+  };
 
   // Handle keyboard movement when rack is selected
   useEffect(() => {
@@ -253,7 +440,22 @@ const DoubleRack = ({
 
   // Handle rotation
   const handleRotate = () => {
-    setCurrentRotation(rotateRack(currentRotation));
+    const newRotation = rotateRack(currentRotation);
+    setCurrentRotation(newRotation);
+    
+    // Calculate degrees based on rotation
+    const degrees = (newRotation * 180 / Math.PI) % 360;
+    const rotationDegree = Math.round(degrees / 90) * 90;
+    const finalDegree = rotationDegree === 0 ? 360 : rotationDegree;
+    
+    setRackDegree(finalDegree);
+    
+    if (onUpdate) {
+      onUpdate({
+        id: rackId,
+        rackDegree: finalDegree
+      });
+    }
   };
 
   // Different colors for shelves and slots
@@ -292,45 +494,6 @@ const DoubleRack = ({
     ['#c8e6c9', '#a5d6a7', '#81c784'],  // Light Greens
     ['#bbdefb', '#90caf9', '#64b5f6']   // Light Blues
   ];
-
-  const handleShelfChange = (side, action) => {
-    if (side === 'left') {
-      if (action === 'add' && leftShelves < 6) {
-        setLeftShelves(prev => prev + 1);
-        setLeftSlotsPerShelf(prev => [...prev, 3]);
-      } else if (action === 'remove' && leftShelves > 1) {
-        setLeftShelves(prev => prev - 1);
-        setLeftSlotsPerShelf(prev => prev.slice(0, -1));
-      }
-    } else {
-      if (action === 'add' && rightShelves < 6) {
-        setRightShelves(prev => prev + 1);
-        setRightSlotsPerShelf(prev => [...prev, 3]);
-      } else if (action === 'remove' && rightShelves > 1) {
-        setRightShelves(prev => prev - 1);
-        setRightSlotsPerShelf(prev => prev.slice(0, -1));
-      }
-    }
-  };
-
-  const handleSlotChange = (action) => {
-    if (!selectedShelf.side) return;
-
-    const isLeft = selectedShelf.side === 'left';
-    const currentSlots = isLeft ? leftSlotsPerShelf : rightSlotsPerShelf;
-    const setSlots = isLeft ? setLeftSlotsPerShelf : setRightSlotsPerShelf;
-    const currentShelfSlots = currentSlots[selectedShelf.index];
-
-    if (action === 'add' && currentShelfSlots < 6) {
-      const newSlots = [...currentSlots];
-      newSlots[selectedShelf.index]++;
-      setSlots(newSlots);
-    } else if (action === 'remove' && currentShelfSlots > 1) {
-      const newSlots = [...currentSlots];
-      newSlots[selectedShelf.index]--;
-      setSlots(newSlots);
-    }
-  };
 
   const handleShelfSelect = (side, index) => {
     setSelectedShelf({ side, index });
@@ -397,8 +560,6 @@ const DoubleRack = ({
             {isSelected ? "Selected" : "Select"}
           </Text>
         </group>
-
-
       </group>
 
       {/* Vertical Supports */}
@@ -421,151 +582,232 @@ const DoubleRack = ({
       ))}
 
       {/* Left Side */}
+      {hiddenSide === 'left' ? (
+        <SimplePlane side="left" />
+      ) : (
       <RackSide
         position={[0, 0, 0]}
         size={size}
-        shelvesCount={leftShelves}
-        slotsPerShelf={leftSlotsPerShelf}
+        shelvesCount={sides.left.shelves.length}
+        slotsPerShelf={sides.left.shelves.map(shelf => shelf.slots.length)}
         shelfColors={leftShelfColors}
-        slotColors={leftSlotColors[Math.min(leftShelves - 1, 5)]}
+        slotColors={leftSlotColors[Math.min(sides.left.shelves.length - 1, 5)]}
         isRightSide={false}
         onShelfSelect={(index) => handleShelfSelect('left', index)}
         selectedShelfIndex={selectedShelf.side === 'left' ? selectedShelf.index : -1}
         rackId={rackId}
+        shelves={sides.left.shelves}
         side="L"
+        onSlotUpdate={handleSlotUpdate}
       />
+      )}
 
       {/* Right Side */}
+      {hiddenSide === 'right' ? (
+        <SimplePlane side="right" />
+      ) : (
       <RackSide
         position={[0, 0, 0]}
         size={size}
-        shelvesCount={rightShelves}
-        slotsPerShelf={rightSlotsPerShelf}
+        shelvesCount={sides.right.shelves.length}
+        slotsPerShelf={sides.right.shelves.map(shelf => shelf.slots.length)}
         shelfColors={rightShelfColors}
-        slotColors={rightSlotColors[Math.min(rightShelves - 1, 5)]}
+        slotColors={rightSlotColors[Math.min(sides.right.shelves.length - 1, 5)]}
         isRightSide={true}
         onShelfSelect={(index) => handleShelfSelect('right', index)}
         selectedShelfIndex={selectedShelf.side === 'right' ? selectedShelf.index : -1}
         rackId={rackId}
+        shelves={sides.right.shelves}
         side="R"
+        onSlotUpdate={handleSlotUpdate}
       />
+      )}
 
       {/* Control Panel on Top */}
       <group position={[0, size.height + 0.3, 0]}>
         {/* Left Side Controls */}
-        <group position={[-size.width / 2 + 0.5, 0, -size.depth / 4]}>
+        <group position={[-0.8, 0, 0]}>
+          {/* <Box args={[1.2, 0.4, 0.1]} position={[0, 0, 0]}>
+            <meshStandardMaterial color="#E0E0E0" />
+          </Box>
           <Text
-            position={[0, 0, 0]}
+            position={[-0.4, 0, 0.06]}
             fontSize={0.15}
             color="black"
             anchorX="center"
             rotation={[0, Math.PI, 0]}
           >
-            Left Side
-          </Text>
-          <group position={[-0.2, -0.2, 0]}>
-            <ControlButton
-              position={[0, 0, 0]}
-              label="-"
-              onClick={() => handleShelfChange('left', 'remove')}
-              color="#e74c3c"
-            />
+            L
+          </Text> */}
+          <ControlButton
+            position={[0.62, 0.10, 0]}
+            label={hiddenSide === 'left' ? 'L-Show' : 'L-Hide'}
+            onClick={(e) => {
+              e.stopPropagation();
+              const newHiddenSide = hiddenSide === 'left' ? null : 'left';
+              setHiddenSide(newHiddenSide);
+              if (onUpdate) {
+                onUpdate({
+                  id: rackId,
+                  rackType: newHiddenSide === 'left' ? 'r-rack' : 'd-rack'
+                });
+              }
+            }}
+            color={hiddenSide === 'left' ? '#ff4444' : '#4CAF50'}
+            labelColor="black"
+          />
+        </group>
+
+        {/* Right Side Controls */}
+        <group position={[0.8, 0, 0]}>
+          {/* <Box args={[1.2, 0.4, 0.1]} position={[0, 0, 0]}>
+            <meshStandardMaterial color="#E0E0E0" />
+          </Box>
+          <Text
+            position={[0.4, 0, 0.06]}
+            fontSize={0.15}
+            color="black"
+            anchorX="center"
+          >
+            R
+          </Text> */}
+          <ControlButton
+            position={[-0.62, 0.10, 0]}
+            label={hiddenSide === 'right' ? 'R-Show' : 'R-Hide'}
+            onClick={(e) => {
+              e.stopPropagation();
+              const newHiddenSide = hiddenSide === 'right' ? null : 'right';
+              setHiddenSide(newHiddenSide);
+              if (onUpdate) {
+                onUpdate({
+                  id: rackId,
+                  rackType: newHiddenSide === 'right' ? 'l-rack' : 'd-rack'
+                });
+              }
+            }}
+            color={hiddenSide === 'right' ? '#ff4444' : '#4CAF50'}
+            labelColor="black"
+          />
+        </group>
+
+        {/* Left Side Controls - Only show if not hidden */}
+        {hiddenSide !== 'left' && (
+          <group position={[-size.width / 2 + 0.5, 0, -size.depth / 4]}>
             <Text
-              position={[0.2, 0, 0]}
+              position={[0, 0, 0]}
               fontSize={0.15}
               color="black"
               anchorX="center"
               rotation={[0, Math.PI, 0]}
             >
-              {leftShelves}
+              Left Side
             </Text>
-            <ControlButton
-              position={[0.4, 0, 0]}
-              label="+"
-              onClick={() => handleShelfChange('left', 'add')}
-            />
-          </group>
-          {selectedShelf.side === 'left' && selectedShelf.index !== -1 && (
-            <group position={[1, -0.2, 0]}>
+            <group position={[-0.2, -0.2, 0]}>
+              <ControlButton
+                position={[0, 0, 0]}
+                label="-"
+                onClick={() => handleShelfChange('left', 'remove')}
+                color="#e74c3c"
+              />
               <Text
-                position={[0, 0.2, 0]}
-                fontSize={0.12}
+                position={[0.2, 0, 0]}
+                fontSize={0.15}
                 color="black"
                 anchorX="center"
                 rotation={[0, Math.PI, 0]}
               >
-                Slots: {leftSlotsPerShelf[selectedShelf.index]}
+                {sides.left.shelves.length}
               </Text>
               <ControlButton
-                position={[-0.2, 0, 0]}
-                label="-"
-                onClick={() => handleSlotChange('remove')}
-                color="#e74c3c"
-              />
-              <ControlButton
-                position={[0.2, 0, 0]}
+                position={[0.4, 0, 0]}
                 label="+"
-                onClick={() => handleSlotChange('add')}
+                onClick={() => handleShelfChange('left', 'add')}
               />
             </group>
-          )}
-        </group>
+            {selectedShelf.side === 'left' && selectedShelf.index !== -1 && (
+              <group position={[1, -0.2, 0]}>
+                <Text
+                  position={[0, 0.2, 0]}
+                  fontSize={0.12}
+                  color="black"
+                  anchorX="center"
+                  rotation={[0, Math.PI, 0]}
+                >
+                  Slots: {sides.left.shelves[selectedShelf.index].slots.length}
+                </Text>
+                <ControlButton
+                  position={[-0.2, 0, 0]}
+                  label="-"
+                  onClick={() => handleSlotChange('remove')}
+                  color="#e74c3c"
+                />
+                <ControlButton
+                  position={[0.2, 0, 0]}
+                  label="+"
+                  onClick={() => handleSlotChange('add')}
+                />
+              </group>
+            )}
+          </group>
+        )}
 
-        {/* Right Side Controls */}
-        <group position={[-size.width / 2 + 0.5, 0, size.depth / 4]}>
-          <Text
-            position={[0, 0, 0]}
-            fontSize={0.15}
-            color="black"
-            anchorX="center"
-          >
-            Right Side
-          </Text>
-          <group position={[-0.2, -0.2, 0]}>
-            <ControlButton
-              position={[0, 0, 0]}
-              label="-"
-              onClick={() => handleShelfChange('right', 'remove')}
-              color="#e74c3c"
-            />
+        {/* Right Side Controls - Only show if not hidden */}
+        {hiddenSide !== 'right' && (
+          <group position={[-size.width / 2 + 0.5, 0, size.depth / 4]}>
             <Text
-              position={[0.2, 0, 0]}
+              position={[0, 0, 0]}
               fontSize={0.15}
               color="black"
               anchorX="center"
             >
-              {rightShelves}
+              Right Side
             </Text>
-            <ControlButton
-              position={[0.4, 0, 0]}
-              label="+"
-              onClick={() => handleShelfChange('right', 'add')}
-            />
-          </group>
-          {selectedShelf.side === 'right' && selectedShelf.index !== -1 && (
-            <group position={[1, -0.2, 0]}>
+            <group position={[-0.2, -0.2, 0]}>
+              <ControlButton
+                position={[0, 0, 0]}
+                label="-"
+                onClick={() => handleShelfChange('right', 'remove')}
+                color="#e74c3c"
+              />
               <Text
-                position={[0, 0.2, 0]}
-                fontSize={0.12}
+                position={[0.2, 0, 0]}
+                fontSize={0.15}
                 color="black"
                 anchorX="center"
               >
-                Slots: {rightSlotsPerShelf[selectedShelf.index]}
+                {sides.right.shelves.length}
               </Text>
               <ControlButton
-                position={[-0.2, 0, 0]}
-                label="-"
-                onClick={() => handleSlotChange('remove')}
-                color="#e74c3c"
-              />
-              <ControlButton
-                position={[0.2, 0, 0]}
+                position={[0.4, 0, 0]}
                 label="+"
-                onClick={() => handleSlotChange('add')}
+                onClick={() => handleShelfChange('right', 'add')}
               />
             </group>
-          )}
-        </group>
+            {selectedShelf.side === 'right' && selectedShelf.index !== -1 && (
+              <group position={[1, -0.2, 0]}>
+                <Text
+                  position={[0, 0.2, 0]}
+                  fontSize={0.12}
+                  color="black"
+                  anchorX="center"
+                >
+                  Slots: {sides.right.shelves[selectedShelf.index].slots.length}
+                </Text>
+                <ControlButton
+                  position={[-0.2, 0, 0]}
+                  label="-"
+                  onClick={() => handleSlotChange('remove')}
+                  color="#e74c3c"
+                />
+                <ControlButton
+                  position={[0.2, 0, 0]}
+                  label="+"
+                  onClick={() => handleSlotChange('add')}
+                />
+              </group>
+            )}
+          </group>
+        )}
       </group>
     </group>
   );

@@ -92,26 +92,100 @@ const Aisle = ({
 
   const addRack = (type = 'double') => {
     setCurrentRacks(prevRacks => {
-      const newRackId = `R${prevRacks.length + 1}`;
-      return [...prevRacks, {
-        ...generateRackData(newRackId),
+      const newRacks = [...prevRacks, {
+        ...generateRackData(`A${aisleId}-R${prevRacks.length + 1}`),
         position: [prevRacks.length * rackSpacing, 0, 0],
         size: { width: 2, depth: 1, height: 3 },
         color: `hsl(${Math.random() * 360}, 70%, 60%)`,
         type
       }];
+      if (onRackUpdate) {
+        onRackUpdate({
+          action: 'add',
+          racks: newRacks
+        });
+      }
+      return newRacks;
     });
   };
 
   const removeRack = () => {
     if (currentRacks.length > 1) {
-      setCurrentRacks(prevRacks => prevRacks.slice(0, -1));
+      setCurrentRacks(prevRacks => {
+        const newRacks = prevRacks.slice(0, -1);
+        if (onRackUpdate) {
+          onRackUpdate({
+            action: 'delete',
+            racks: newRacks
+          });
+        }
+        return newRacks;
+      });
     }
   };
 
   const handleRackChange = (rackData) => {
+    console.log('Rack update in Aisle:', rackData);
+    
+    if (rackData.updatedSlot) {
+      // Update the slot in the current racks
+      setCurrentRacks(prevRacks => {
+        const newRacks = prevRacks.map(rack => {
+          if (rack.id === rackData.id) {
+            return {
+              ...rack,
+              sides: {
+                left: {
+                  ...rack.sides.left,
+                  shelves: rack.sides.left.shelves.map(shelf => ({
+                    ...shelf,
+                    slots: shelf.slots.map(slot => 
+                      slot.id === rackData.updatedSlot.id ? rackData.updatedSlot : slot
+                    )
+                  }))
+                },
+                right: {
+                  ...rack.sides.right,
+                  shelves: rack.sides.right.shelves.map(shelf => ({
+                    ...shelf,
+                    slots: shelf.slots.map(slot => 
+                      slot.id === rackData.updatedSlot.id ? rackData.updatedSlot : slot
+                    )
+                  }))
+                }
+              }
+            };
+          }
+          return rack;
+        });
+        
+        console.log('Updated racks in Aisle:', newRacks);
+        return newRacks;
+      });
+    }
+
+    // Pass the update to the parent
     if (onRackUpdate) {
-      onRackUpdate(rackData);
+      onRackUpdate(aisleId, rackData);
+    }
+  };
+
+  const handleRotate = () => {
+    const newRotation = rotateRack(currentRotation);
+    setCurrentRotation(newRotation);
+    
+    // Calculate degrees based on rotation
+    const degrees = (newRotation * 180 / Math.PI) % 360;
+    const rotationDegree = Math.round(degrees / 90) * 90;
+    const finalDegree = rotationDegree === 0 ? 360 : rotationDegree;
+    
+    console.log("Rotating aisle:", aisleId, "to degree:", finalDegree);
+    
+    if (onRackUpdate) {
+      onRackUpdate({
+        id: aisleId,
+        aisleDegree: finalDegree
+      });
     }
   };
 
@@ -203,7 +277,7 @@ const Aisle = ({
             <ControlButton
               position={[0.4, 0.4, 0]}
               label="↻"
-              onClick={() => setCurrentRotation(rotateRack(currentRotation))}
+              onClick={handleRotate}
               color="#9C27B0"
             />
           </group>

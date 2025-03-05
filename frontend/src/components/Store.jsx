@@ -26,10 +26,11 @@ const Store = () => {
     { 
       id: 0, 
       position: [0, 0, 0], 
-      isNinetyDegree: false,
+      aisleDegree: 360,
       racks: Array.from({ length: 3 }, (_, index) => ({
         id: `A0-R${index + 1}`,
         position: [index * 3, 0, 0],
+        rackType: 'd-rack', // Default rack type
         sides: {
           left: {
             id: `A0-R${index + 1}-L`,
@@ -73,6 +74,58 @@ const Store = () => {
         size: { width: 2, depth: 1, height: 3 },
         color: `hsl(${Math.random() * 360}, 70%, 60%)`
       }))
+    },
+    { 
+      id: 1, 
+      position: [0, 0, 5], 
+      aisleDegree: 360,
+      racks: Array.from({ length: 3 }, (_, index) => ({
+        id: `A1-R${index + 1}`,
+        position: [index * 3, 0, 0],
+        rackType: 'd-rack', // Default rack type
+        sides: {
+          left: {
+            id: `A1-R${index + 1}-L`,
+            shelvesCount: 4,
+            slotsPerShelf: [3, 3, 3, 3],
+            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+              id: `A1-R${index + 1}-L-SH${shelfIndex + 1}`,
+              slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                const slotId = `A1-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                return {
+                  id: slotId,
+                  productId: `P${Math.floor(Math.random() * 1000)}`,
+                  productName: `Product ${Math.floor(Math.random() * 100)}`,
+                  description: `Description for product in slot ${slotId}`,
+                  price: (Math.random() * 100).toFixed(2),
+                  quantity: Math.floor(Math.random() * 50)
+                };
+              })
+            }))
+          },
+          right: {
+            id: `A1-R${index + 1}-R`,
+            shelvesCount: 4,
+            slotsPerShelf: [3, 3, 3, 3],
+            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
+              id: `A1-R${index + 1}-R-SH${shelfIndex + 1}`,
+              slots: Array.from({ length: 3 }, (_, slotIndex) => {
+                const slotId = `A1-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                return {
+                  id: slotId,
+                  productId: `P${Math.floor(Math.random() * 1000)}`,
+                  productName: `Product ${Math.floor(Math.random() * 100)}`,
+                  description: `Description for product in slot ${slotId}`,
+                  price: (Math.random() * 100).toFixed(2),
+                  quantity: Math.floor(Math.random() * 50)
+                };
+              })
+            }))
+          }
+        },
+        size: { width: 2, depth: 1, height: 3 },
+        color: `hsl(${Math.random() * 360}, 70%, 60%)`
+      }))
     }
   ]);
   const [selectedAisle, setSelectedAisle] = useState(null);
@@ -84,10 +137,11 @@ const Store = () => {
       {
         id: prevAisles.length,
         position: [point.x, 0, point.z],
-        isNinetyDegree: false,
+        aisleDegree: 360,
         racks: Array.from({ length: 3 }, (_, index) => ({
           id: `A${prevAisles.length}-R${index + 1}`,
           position: [index * 3, 0, 0],
+          rackType: 'd-rack', // Default rack type
           sides: {
             left: {
               id: `A${prevAisles.length}-R${index + 1}-L`,
@@ -144,20 +198,212 @@ const Store = () => {
   };
 
   const updateRackData = (aisleId, rackData) => {
-    setAisles(prevAisles => 
-      prevAisles.map(aisle => 
-        aisle.id === aisleId 
-          ? {
+    console.log('Updating rack data:', rackData);
+    
+    if (rackData.action === 'add' || rackData.action === 'delete') {
+      // Handle rack addition or deletion
+      setAisles(prevAisles => 
+        prevAisles.map(aisle => 
+          aisle.id === aisleId 
+            ? {
+                ...aisle,
+                racks: rackData.racks.map((rack, index) => ({
+                  id: `A${aisleId}-R${index + 1}`,
+                  position: [index * 3, 0, 0],
+                  rackType: rack.rackType || 'd-rack', // Preserve or set default rack type
+                  sides: {
+                    left: {
+                      ...rack.sides.left,
+                      shelves: Array.from({ length: rack.sides.left.shelvesCount }, (_, shelfIndex) => ({
+                        id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}`,
+                        slots: Array.from({ length: rack.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                          id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                          productId: `P${Math.floor(Math.random() * 1000)}`,
+                          productName: `Product ${Math.floor(Math.random() * 100)}`,
+                          description: `Description for product`,
+                          price: (Math.random() * 100).toFixed(2),
+                          quantity: Math.floor(Math.random() * 50)
+                        }))
+                      }))
+                    },
+                    right: {
+                      ...rack.sides.right,
+                      shelves: Array.from({ length: rack.sides.right.shelvesCount }, (_, shelfIndex) => ({
+                        id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}`,
+                        slots: Array.from({ length: rack.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                          id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                          productId: `P${Math.floor(Math.random() * 1000)}`,
+                          productName: `Product ${Math.floor(Math.random() * 100)}`,
+                          description: `Description for product`,
+                          price: (Math.random() * 100).toFixed(2),
+                          quantity: Math.floor(Math.random() * 50)
+                        }))
+                      }))
+                    }
+                  },
+                  size: { width: 2, depth: 1, height: 3 },
+                  color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
+                }))
+              }
+            : aisle
+        )
+      );
+    } else if (rackData.rackType) {
+      // Handle rack type updates
+      setAisles(prevAisles => 
+        prevAisles.map(aisle => 
+          aisle.id === aisleId 
+            ? {
+                ...aisle,
+                racks: aisle.racks.map(rack => 
+                  rack.id === rackData.id 
+                    ? {
+                        ...rack,
+                        rackType: rackData.rackType
+                      }
+                    : rack
+                )
+              }
+            : aisle
+        )
+      );
+    } else if (rackData.updatedSlot) {
+      // Handle slot updates from SlotForm
+      console.log('Updating slot in Store:', rackData.updatedSlot);
+      
+      setAisles(prevAisles => {
+        const newAisles = prevAisles.map(aisle => {
+          if (aisle.id === aisleId) {
+            console.log('Found matching aisle:', aisle.id);
+            return {
               ...aisle,
-              racks: aisle.racks.map(rack => 
-                rack.id === rackData.id 
-                  ? { ...rack, sides: rackData.sides }
-                  : rack
-              )
-            }
-          : aisle
-      )
-    );
+              racks: aisle.racks.map(rack => {
+                if (rack.id === rackData.id) {
+                  console.log('Found matching rack:', rack.id);
+                  return {
+                    ...rack,
+                    sides: {
+                      left: {
+                        ...rack.sides.left,
+                        shelves: rack.sides.left.shelves.map(shelf => ({
+                          ...shelf,
+                          slots: shelf.slots.map(slot => {
+                            if (slot.id === rackData.updatedSlot.id) {
+                              console.log('Updating slot:', slot.id, 'with:', rackData.updatedSlot);
+                              return rackData.updatedSlot;
+                            }
+                            return slot;
+                          })
+                        }))
+                      },
+                      right: {
+                        ...rack.sides.right,
+                        shelves: rack.sides.right.shelves.map(shelf => ({
+                          ...shelf,
+                          slots: shelf.slots.map(slot => {
+                            if (slot.id === rackData.updatedSlot.id) {
+                              console.log('Updating slot:', slot.id, 'with:', rackData.updatedSlot);
+                              return rackData.updatedSlot;
+                            }
+                            return slot;
+                          })
+                        }))
+                      }
+                    }
+                  };
+                }
+                return rack;
+              })
+            };
+          }
+          return aisle;
+        });
+        
+        console.log('Updated aisle structure:', newAisles);
+        return newAisles;
+      });
+    } else if (rackData.rackDegree !== undefined) {
+      // Handle rack degree updates
+      console.log("Updating rack degree for id:", rackData.id);
+      setAisles(prevAisles => {
+        const newAisles = prevAisles.map(aisle => ({
+          ...aisle,
+          racks: aisle.racks.map(rack =>
+            rack.id === rackData.id
+              ? {
+                  ...rack,
+                  rackDegree: rackData.rackDegree
+                }
+              : rack
+          )
+        }));
+        console.log("New aisles:", newAisles);
+        return newAisles;
+      });
+    } else if (rackData.aisleDegree !== undefined) {
+      // Handle aisle degree updates
+      console.log("Updating aisle degree for id:", aisleId);
+      setAisles(prevAisles => {
+        const newAisles = prevAisles.map(aisle => 
+          aisle.id === aisleId 
+            ? {
+                ...aisle,
+                aisleDegree: rackData.aisleDegree
+              }
+            : aisle
+        );
+        console.log("New aisles:", newAisles);
+        return newAisles;
+      });
+    } else {
+      // Handle other rack updates (shelf/slot structure changes)
+      setAisles(prevAisles => 
+        prevAisles.map(aisle => 
+          aisle.id === aisleId 
+            ? {
+                ...aisle,
+                racks: aisle.racks.map(rack => 
+                  rack.id === rackData.id 
+                    ? {
+                        ...rack,
+                        sides: {
+                          left: {
+                            ...rackData.sides.left,
+                            shelves: Array.from({ length: rackData.sides.left.shelvesCount }, (_, shelfIndex) => ({
+                              id: `${rackData.id}-L-SH${shelfIndex + 1}`,
+                              slots: Array.from({ length: rackData.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                                id: `${rackData.id}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                                productId: `P${Math.floor(Math.random() * 1000)}`,
+                                productName: `Product ${Math.floor(Math.random() * 100)}`,
+                                description: `Description for product`,
+                                price: (Math.random() * 100).toFixed(2),
+                                quantity: Math.floor(Math.random() * 50)
+                              }))
+                            }))
+                          },
+                          right: {
+                            ...rackData.sides.right,
+                            shelves: Array.from({ length: rackData.sides.right.shelvesCount }, (_, shelfIndex) => ({
+                              id: `${rackData.id}-R-SH${shelfIndex + 1}`,
+                              slots: Array.from({ length: rackData.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                                id: `${rackData.id}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                                productId: `P${Math.floor(Math.random() * 1000)}`,
+                                productName: `Product ${Math.floor(Math.random() * 100)}`,
+                                description: `Description for product`,
+                                price: (Math.random() * 100).toFixed(2),
+                                quantity: Math.floor(Math.random() * 50)
+                              }))
+                            }))
+                          }
+                        }
+                      }
+                    : rack
+                )
+              }
+            : aisle
+        )
+      );
+    }
   };
 
   console.log(aisles);
@@ -170,10 +416,11 @@ const Store = () => {
         {
           id: prevAisles.length,
           position: [point.x, 0, point.z],
-          isNinetyDegree: false,
+          aisleDegree: 360,
           racks: Array.from({ length: 3 }, (_, index) => ({
             id: `A${prevAisles.length}-R${index + 1}`,
             position: [index * 3, 0, 0],
+            rackType: 'd-rack', // Default rack type
             sides: {
               left: {
                 id: `A${prevAisles.length}-R${index + 1}-L`,
