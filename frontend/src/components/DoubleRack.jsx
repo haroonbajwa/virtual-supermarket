@@ -60,13 +60,13 @@ const Slot = ({ position, size, color, slotData, onUpdate }) => {
         />
       </Box>
       <Text
-        position={[0, size.height / 2 + 0.1, size.depth / 2]}
+        position={[0, size.height / 2 -0.3, size.depth / 2+0.01]}
         fontSize={0.1}
         color="black"
         anchorX="center"
         anchorY="bottom"
       >
-        {`${slotData.productName} (${slotData.id})`}
+        {slotData.productName}
       </Text>
 
       {/* Projection effect when selected */}
