@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -8,6 +8,7 @@ import {
   Html
 } from '@react-three/drei';
 import Aisle from './Aisle';
+import { layoutService } from '../services/layout.service';
 
 // Realistic color palette
 const colors = {
@@ -23,9 +24,9 @@ const colors = {
 
 const Store = () => {
   const [aisles, setAisles] = useState([
-    { 
-      id: 0, 
-      position: [0, 0, 0], 
+    {
+      id: 0,
+      position: [0, 0, 0],
       aisleDegree: 360,
       racks: Array.from({ length: 3 }, (_, index) => ({
         id: `A0-R${index + 1}`,
@@ -75,9 +76,9 @@ const Store = () => {
         color: `hsl(${Math.random() * 360}, 70%, 60%)`
       }))
     },
-    { 
-      id: 1, 
-      position: [0, 0, 5], 
+    {
+      id: 1,
+      position: [0, 0, 5],
       aisleDegree: 360,
       racks: Array.from({ length: 3 }, (_, index) => ({
         id: `A1-R${index + 1}`,
@@ -130,6 +131,92 @@ const Store = () => {
   ]);
   const [selectedAisle, setSelectedAisle] = useState(null);
   const [isPlacingRegularAisle, setIsPlacingRegularAisle] = useState(false);
+  const [layouts, setLayouts] = useState([]);
+  const [selectedLayout, setSelectedLayout] = useState(null);
+  const [layoutName, setLayoutName] = useState('');
+
+  console.log(aisles, "aisles state")
+
+  // Fetch all layouts on component mount
+  useEffect(() => {
+    loadLayouts();
+  }, []);
+
+  const loadLayouts = async () => {
+    try {
+      const fetchedLayouts = await layoutService.getAllLayouts();
+      setLayouts(fetchedLayouts);
+    } catch (error) {
+      console.error('Error loading layouts:', error);
+    }
+  };
+
+  const handleSaveLayout = async () => {
+    if (!layoutName.trim()) {
+      alert('Please enter a layout name');
+      return;
+    }
+
+    try {
+      const layoutData = {
+        name: layoutName,
+        aisles: aisles
+      };
+
+      if (selectedLayout) {
+        // Update existing layout
+        await layoutService.updateLayout(selectedLayout._id, layoutData);
+      } else {
+        // Save new layout
+        await layoutService.saveLayout(layoutData);
+      }
+
+      // Refresh layouts list
+      await loadLayouts();
+      setLayoutName('');
+      setSelectedLayout(null);
+      alert('Layout saved successfully!');
+    } catch (error) {
+      console.error('Error saving layout:', error);
+      alert('Error saving layout. Please try again.');
+    }
+  };
+
+  const handleLoadLayout = async (layout) => {
+    if (selectedLayout) {
+      setSelectedLayout(null)
+    }
+    else {
+      try {
+        const loadedLayout = await layoutService.getLayout(layout._id);
+        setAisles(loadedLayout.aisles);
+        setSelectedLayout(layout);
+        setLayoutName(layout.name);
+      } catch (error) {
+        console.error('Error loading layout:', error);
+        alert('Error loading layout. Please try again.');
+      }
+    }
+  };
+
+  const handleDeleteLayout = async (layout) => {
+    if (!window.confirm('Are you sure you want to delete this layout?')) {
+      return;
+    }
+
+    try {
+      await layoutService.deleteLayout(layout._id);
+      await loadLayouts();
+      if (selectedLayout?._id === layout._id) {
+        setSelectedLayout(null);
+        setLayoutName('');
+      }
+      alert('Layout deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting layout:', error);
+      alert('Error deleting layout. Please try again.');
+    }
+  };
 
   const addAisle = (point) => {
     setAisles(prevAisles => [
@@ -199,78 +286,78 @@ const Store = () => {
 
   const updateRackData = (aisleId, rackData) => {
     console.log('Updating rack data:', rackData);
-    
+
     if (rackData.action === 'add' || rackData.action === 'delete') {
       // Handle rack addition or deletion
-      setAisles(prevAisles => 
-        prevAisles.map(aisle => 
-          aisle.id === aisleId 
+      setAisles(prevAisles =>
+        prevAisles.map(aisle =>
+          aisle.id === aisleId
             ? {
-                ...aisle,
-                racks: rackData.racks.map((rack, index) => ({
-                  id: `A${aisleId}-R${index + 1}`,
-                  position: [index * 3, 0, 0],
-                  rackType: rack.rackType || 'd-rack', // Preserve or set default rack type
-                  sides: {
-                    left: {
-                      ...rack.sides.left,
-                      shelves: Array.from({ length: rack.sides.left.shelvesCount }, (_, shelfIndex) => ({
-                        id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}`,
-                        slots: Array.from({ length: rack.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                          id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                          productId: `P${Math.floor(Math.random() * 1000)}`,
-                          productName: `Product ${Math.floor(Math.random() * 100)}`,
-                          description: `Description for product`,
-                          price: (Math.random() * 100).toFixed(2),
-                          quantity: Math.floor(Math.random() * 50)
-                        }))
+              ...aisle,
+              racks: rackData.racks.map((rack, index) => ({
+                id: `A${aisleId}-R${index + 1}`,
+                position: [index * 3, 0, 0],
+                rackType: rack.rackType || 'd-rack', // Preserve or set default rack type
+                sides: {
+                  left: {
+                    ...rack.sides.left,
+                    shelves: Array.from({ length: rack.sides.left.shelvesCount }, (_, shelfIndex) => ({
+                      id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}`,
+                      slots: Array.from({ length: rack.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                        id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                        productId: `P${Math.floor(Math.random() * 1000)}`,
+                        productName: `Product ${Math.floor(Math.random() * 100)}`,
+                        description: `Description for product`,
+                        price: (Math.random() * 100).toFixed(2),
+                        quantity: Math.floor(Math.random() * 50)
                       }))
-                    },
-                    right: {
-                      ...rack.sides.right,
-                      shelves: Array.from({ length: rack.sides.right.shelvesCount }, (_, shelfIndex) => ({
-                        id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}`,
-                        slots: Array.from({ length: rack.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                          id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                          productId: `P${Math.floor(Math.random() * 1000)}`,
-                          productName: `Product ${Math.floor(Math.random() * 100)}`,
-                          description: `Description for product`,
-                          price: (Math.random() * 100).toFixed(2),
-                          quantity: Math.floor(Math.random() * 50)
-                        }))
-                      }))
-                    }
+                    }))
                   },
-                  size: { width: 2, depth: 1, height: 3 },
-                  color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
-                }))
-              }
+                  right: {
+                    ...rack.sides.right,
+                    shelves: Array.from({ length: rack.sides.right.shelvesCount }, (_, shelfIndex) => ({
+                      id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}`,
+                      slots: Array.from({ length: rack.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                        id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                        productId: `P${Math.floor(Math.random() * 1000)}`,
+                        productName: `Product ${Math.floor(Math.random() * 100)}`,
+                        description: `Description for product`,
+                        price: (Math.random() * 100).toFixed(2),
+                        quantity: Math.floor(Math.random() * 50)
+                      }))
+                    }))
+                  }
+                },
+                size: { width: 2, depth: 1, height: 3 },
+                color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
+              }))
+            }
             : aisle
         )
       );
     } else if (rackData.rackType) {
       // Handle rack type updates
-      setAisles(prevAisles => 
-        prevAisles.map(aisle => 
-          aisle.id === aisleId 
+      setAisles(prevAisles =>
+        prevAisles.map(aisle =>
+          aisle.id === aisleId
             ? {
-                ...aisle,
-                racks: aisle.racks.map(rack => 
-                  rack.id === rackData.id 
-                    ? {
-                        ...rack,
-                        rackType: rackData.rackType
-                      }
-                    : rack
-                )
-              }
+              ...aisle,
+              racks: aisle.racks.map(rack =>
+                rack.id === rackData.id
+                  ? {
+                    ...rack,
+                    rackType: rackData.rackType
+                  }
+                  : rack
+              )
+            }
             : aisle
         )
       );
     } else if (rackData.updatedSlot) {
       // Handle slot updates from SlotForm
       console.log('Updating slot in Store:', rackData.updatedSlot);
-      
+
       setAisles(prevAisles => {
         const newAisles = prevAisles.map(aisle => {
           if (aisle.id === aisleId) {
@@ -318,7 +405,7 @@ const Store = () => {
           }
           return aisle;
         });
-        
+
         console.log('Updated aisle structure:', newAisles);
         return newAisles;
       });
@@ -331,9 +418,9 @@ const Store = () => {
           racks: aisle.racks.map(rack =>
             rack.id === rackData.id
               ? {
-                  ...rack,
-                  rackDegree: rackData.rackDegree
-                }
+                ...rack,
+                rackDegree: rackData.rackDegree
+              }
               : rack
           )
         }));
@@ -344,12 +431,12 @@ const Store = () => {
       // Handle aisle degree updates
       console.log("Updating aisle degree for id:", aisleId);
       setAisles(prevAisles => {
-        const newAisles = prevAisles.map(aisle => 
-          aisle.id === aisleId 
+        const newAisles = prevAisles.map(aisle =>
+          aisle.id === aisleId
             ? {
-                ...aisle,
-                aisleDegree: rackData.aisleDegree
-              }
+              ...aisle,
+              aisleDegree: rackData.aisleDegree
+            }
             : aisle
         );
         console.log("New aisles:", newAisles);
@@ -357,49 +444,49 @@ const Store = () => {
       });
     } else {
       // Handle other rack updates (shelf/slot structure changes)
-      setAisles(prevAisles => 
-        prevAisles.map(aisle => 
-          aisle.id === aisleId 
+      setAisles(prevAisles =>
+        prevAisles.map(aisle =>
+          aisle.id === aisleId
             ? {
-                ...aisle,
-                racks: aisle.racks.map(rack => 
-                  rack.id === rackData.id 
-                    ? {
-                        ...rack,
-                        sides: {
-                          left: {
-                            ...rackData.sides.left,
-                            shelves: Array.from({ length: rackData.sides.left.shelvesCount }, (_, shelfIndex) => ({
-                              id: `${rackData.id}-L-SH${shelfIndex + 1}`,
-                              slots: Array.from({ length: rackData.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                                id: `${rackData.id}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                                productId: `P${Math.floor(Math.random() * 1000)}`,
-                                productName: `Product ${Math.floor(Math.random() * 100)}`,
-                                description: `Description for product`,
-                                price: (Math.random() * 100).toFixed(2),
-                                quantity: Math.floor(Math.random() * 50)
-                              }))
-                            }))
-                          },
-                          right: {
-                            ...rackData.sides.right,
-                            shelves: Array.from({ length: rackData.sides.right.shelvesCount }, (_, shelfIndex) => ({
-                              id: `${rackData.id}-R-SH${shelfIndex + 1}`,
-                              slots: Array.from({ length: rackData.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                                id: `${rackData.id}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                                productId: `P${Math.floor(Math.random() * 1000)}`,
-                                productName: `Product ${Math.floor(Math.random() * 100)}`,
-                                description: `Description for product`,
-                                price: (Math.random() * 100).toFixed(2),
-                                quantity: Math.floor(Math.random() * 50)
-                              }))
-                            }))
-                          }
-                        }
+              ...aisle,
+              racks: aisle.racks.map(rack =>
+                rack.id === rackData.id
+                  ? {
+                    ...rack,
+                    sides: {
+                      left: {
+                        ...rackData.sides.left,
+                        shelves: Array.from({ length: rackData.sides.left.shelvesCount }, (_, shelfIndex) => ({
+                          id: `${rackData.id}-L-SH${shelfIndex + 1}`,
+                          slots: Array.from({ length: rackData.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                            id: `${rackData.id}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                            productId: `P${Math.floor(Math.random() * 1000)}`,
+                            productName: `Product ${Math.floor(Math.random() * 100)}`,
+                            description: `Description for product`,
+                            price: (Math.random() * 100).toFixed(2),
+                            quantity: Math.floor(Math.random() * 50)
+                          }))
+                        }))
+                      },
+                      right: {
+                        ...rackData.sides.right,
+                        shelves: Array.from({ length: rackData.sides.right.shelvesCount }, (_, shelfIndex) => ({
+                          id: `${rackData.id}-R-SH${shelfIndex + 1}`,
+                          slots: Array.from({ length: rackData.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
+                            id: `${rackData.id}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
+                            productId: `P${Math.floor(Math.random() * 1000)}`,
+                            productName: `Product ${Math.floor(Math.random() * 100)}`,
+                            description: `Description for product`,
+                            price: (Math.random() * 100).toFixed(2),
+                            quantity: Math.floor(Math.random() * 50)
+                          }))
+                        }))
                       }
-                    : rack
-                )
-              }
+                    }
+                  }
+                  : rack
+              )
+            }
             : aisle
         )
       );
@@ -577,6 +664,101 @@ const Store = () => {
         </div>
       </div>
 
+      {/* Layout Controls */}
+      <div style={{
+        position: 'absolute',
+        top: '20px',
+        right: '20px',
+        zIndex: 1000,
+        padding: '20px',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        borderRadius: '12px',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+        color: 'white',
+        width: '300px'
+      }}>
+        <h3 style={{ marginBottom: '15px' }}>Layout Controls</h3>
+
+        {/* Save Layout */}
+        <div style={{ marginBottom: '15px' }}>
+          <input
+            type="text"
+            value={layoutName}
+            onChange={(e) => setLayoutName(e.target.value)}
+            placeholder="Enter layout name"
+            style={{
+              padding: '8px',
+              marginRight: '10px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              width: '100%',
+              marginBottom: '10px'
+            }}
+          />
+          <button
+            onClick={handleSaveLayout}
+            style={{
+              padding: '8px 15px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              width: '100%'
+            }}
+          >
+            {selectedLayout ? 'Update Layout' : 'Save Layout'}
+          </button>
+        </div>
+
+        {/* Layouts List */}
+        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+          <h4 style={{ marginBottom: '10px' }}>Saved Layouts</h4>
+          {layouts.map(layout => (
+            <div
+              key={layout._id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                marginBottom: '8px',
+                padding: '8px',
+                backgroundColor: selectedLayout?._id === layout._id ? '#2196F3' : '#333',
+                borderRadius: '4px'
+              }}
+            >
+              <span style={{ flex: 1 }}>{layout.name}</span>
+              <button
+                onClick={() => handleLoadLayout(layout)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  marginRight: '5px',
+                  cursor: 'pointer'
+                }}
+              >
+                Load
+              </button>
+              <button
+                onClick={() => handleDeleteLayout(layout)}
+                style={{
+                  padding: '4px 8px',
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <Canvas
         camera={{ position: [15, 15, 15], fov: 50 }}
         style={{
@@ -656,7 +838,7 @@ const Store = () => {
         </Box>
 
         {/* Aisles */}
-        {aisles.map((aisle, index) => (
+        {aisles?.map((aisle, index) => (
           <group
             key={aisle.id}
             onClick={(e) => handleAisleClick(e, aisle.id)}
