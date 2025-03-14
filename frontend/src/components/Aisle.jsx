@@ -251,7 +251,12 @@ const Aisle = ({
   useEffect(() => {
     if (!isSelected) return;
 
+    let isKeyLocked = false; // Prevent rapid key presses
+
     const handleKeyDown = (event) => {
+      // If another key is already being processed, ignore this keypress
+      if (isKeyLocked) return;
+
       let direction = '';
       switch (event.key) {
         case 'ArrowUp':
@@ -270,13 +275,30 @@ const Aisle = ({
           return;
       }
       
-      const newPosition = moveRack(currentPosition, direction);
-      setCurrentPosition(newPosition);
+      // Lock the key handling to prevent multiple rapid movements
+      isKeyLocked = true;
+
+      // Use a function form of setState to ensure we always have the latest state
+      setCurrentPosition(prevPosition => {
+        const newPosition = moveRack(prevPosition, direction);
+        
+        // Notify parent about position update
+        onRackUpdate({
+          position: newPosition
+        });
+        
+        return newPosition;
+      });
+
+      // Release the key lock after a short delay
+      setTimeout(() => {
+        isKeyLocked = false;
+      }, 100);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected, currentPosition]);
+  }, [isSelected]); // Remove currentPosition from dependencies
 
   return (
     <group position={currentPosition} rotation={[0, currentRotation, 0]}>
