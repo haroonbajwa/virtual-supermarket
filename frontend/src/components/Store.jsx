@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
   PerspectiveCamera,
   Environment,
-  Box,
-  Html
+  Box
 } from '@react-three/drei';
 import Aisle from './Aisle';
 import { layoutService } from '../services/layout.service';
@@ -673,8 +672,8 @@ const Store = () => {
     const rackRotation = rack.rackDegree ? (rack.rackDegree * Math.PI / 180) : 0;
     
     // Calculate camera position based on rack position, side, and rotation
-    const distance = 5; // Increased distance to show the full rack
-    const height = 2.5;   // Slightly increased height for better view
+    const distance = 5; // Reduced distance to get closer to the rack
+    const height = 1.8;   // Adjusted height for better view
     
     // Calculate position with rotation consideration
     // For left side, we want to look at it head-on, so rotate 180 degrees
@@ -686,11 +685,11 @@ const Store = () => {
     // Set camera position and target
     if (cameraRef.current && controlsRef.current) {
       // Animate camera movement to the new position
-      const duration = 1000; // Animation duration in ms
+      const duration = 1500; // Animation duration in ms (extended for smoother motion)
       const startTime = Date.now();
-      const startPosition = [...cameraRef.current.position];
+      const startPosition = [cameraRef.current.position.x, cameraRef.current.position.y, cameraRef.current.position.z];
       const targetPosition = [cameraX, rackPosition[1] + height, cameraZ];
-      const startTarget = [...controlsRef.current.target];
+      const startTarget = [controlsRef.current.target.x, controlsRef.current.target.y, controlsRef.current.target.z];
       // Target the center of the rack for better viewing
       const targetTarget = [rackPosition[0], rackPosition[1] + 1.5, rackPosition[2]];
       
@@ -714,6 +713,9 @@ const Store = () => {
           startTarget[1] + (targetTarget[1] - startTarget[1]) * easeProgress,
           startTarget[2] + (targetTarget[2] - startTarget[2]) * easeProgress
         );
+        
+        // Force control update to ensure camera movement is applied
+        controlsRef.current.update();
         
         if (progress < 1) {
           requestAnimationFrame(animateCamera);
@@ -982,6 +984,18 @@ const Store = () => {
           enableDamping
           dampingFactor={0.05}
           enabled={!isPlacingRegularAisle}
+          // Add boundary constraints to keep camera inside store
+          minDistance={2} // Minimum distance from target
+          maxDistance={45} // Maximum distance from target to stay inside store
+          // Prevent going below floor or above ceiling
+          minPolarAngle={0.1} // Slight restriction from directly above
+          // Allow full rotation around the target
+          rotateSpeed={0.7}
+          mouseButtons={{
+            LEFT: 0, // Rotate (THREE.MOUSE.LEFT) - set to rotate on left mouse
+            MIDDLE: 1, // Dolly (THREE.MOUSE.MIDDLE)
+            RIGHT: 2 // Pan (THREE.MOUSE.RIGHT)
+          }}
         />
 
         {/* Realistic Lighting */}
@@ -1000,7 +1014,7 @@ const Store = () => {
         />
 
         {/* Environment */}
-        <Environment preset="warehouse" background />
+        <Environment preset="warehouse" />
 
         {/* Floor with click handler */}
         <mesh
