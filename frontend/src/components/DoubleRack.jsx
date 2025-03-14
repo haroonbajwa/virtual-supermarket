@@ -291,28 +291,73 @@ const RackSide = ({
   );
 };
 
+// Simple Plane for hidden sides
+const SimplePlane = ({ side }) => {
+  const xOffset = side === 'left' ? -1.5 : 1.5;
+  return (
+    <mesh position={[xOffset, 2, 0]} rotation={[0, side === 'left' ? Math.PI/2 : -Math.PI/2, 0]}>
+      <planeGeometry args={[4, 4]} />
+      <meshStandardMaterial color="#cccccc" opacity={0.8} transparent />
+    </mesh>
+  );
+};
+
 const DoubleRack = ({
   position = [0, 0, 0],
   size = { width: 3, height: 4, depth: 1 },
   color = '#34495e',
   rackId,
   sides,
-  onUpdate
+  rackType = 'd-rack', // Add rackType prop with default
+  onUpdate,
+  rotation = 0
 }) => {
   const [currentPosition, setCurrentPosition] = useState(position);
-  const [currentRotation, setCurrentRotation] = useState(0);
+  const [currentRotation, setCurrentRotation] = useState(rotation);
   const [isSelected, setIsSelected] = useState(false);
   const [selectedShelf, setSelectedShelf] = useState({ side: null, index: -1 });
-  const [hiddenSide, setHiddenSide] = useState(null); // null, 'left', or 'right'
-  const [rackDegree, setRackDegree] = useState(360);
+  const [hiddenSide, setHiddenSide] = useState(null);
+  const [rackDegree, setRackDegree] = useState(rotation * 180 / Math.PI || 360);
 
-  // Simple plane component
-  const SimplePlane = ({ side }) => (
-    <mesh position={[0, size.height / 2, side === 'right' ? size.depth / 4 : -size.depth / 4]}>
-      <planeGeometry args={[size.width, size.height]} />
-      <meshStandardMaterial color={color} side={2} opacity={0.7} transparent />
-    </mesh>
-  );
+  // Initialize hiddenSide based on rackType
+  useEffect(() => {
+    if (rackType === 'l-rack') {
+      setHiddenSide('right');
+    } else if (rackType === 'r-rack') {
+      setHiddenSide('left');
+    } else {
+      // 'd-rack' or any other type
+      setHiddenSide(null);
+    }
+  }, [rackType]);
+
+  useEffect(() => {
+    setCurrentRotation(rotation);
+    setRackDegree(rotation * 180 / Math.PI || 360);
+  }, [rotation]);
+
+  // Update current position when position prop changes
+  useEffect(() => {
+    console.log('DoubleRack receiving new position:', position);
+    setCurrentPosition(position);
+  }, [position]);
+
+  useEffect(() => {
+    // Notify parent of position changes
+    if (onUpdate) {
+      const updateData = {
+        id: rackId,
+        position: currentPosition,
+        rackDegree: rackDegree,
+        sides: {
+          left: { ...sides.left },
+          right: { ...sides.right }
+        }
+      };
+      console.log('Rack sending position update:', updateData);
+      onUpdate(updateData);
+    }
+  }, [currentPosition]);
 
   const handleShelfChange = (side, action) => {
     const newSides = { ...sides };
@@ -385,12 +430,19 @@ const DoubleRack = ({
 
   const handleSlotUpdate = (updatedSlot) => {
     if (onUpdate) {
-      // Log the data being updated
+      // Extract the shelf and slot indices from the slot ID
+      const idParts = updatedSlot.id.split('-');
+      const side = idParts[2]; // 'L' or 'R'
+      const shelfIndex = parseInt(idParts[3].replace('SH', '')) - 1;
+      const slotIndex = parseInt(idParts[4].replace('S', '')) - 1;
+
       console.log('Updating slot in DoubleRack:', {
         id: rackId,
         updatedSlot: {
           ...updatedSlot,
-          id: updatedSlot.id // Ensure ID is preserved
+          side,
+          shelfIndex,
+          slotIndex
         }
       });
       
@@ -398,7 +450,22 @@ const DoubleRack = ({
         id: rackId,
         updatedSlot: {
           ...updatedSlot,
-          id: updatedSlot.id // Ensure ID is preserved
+          side,
+          shelfIndex,
+          slotIndex
+        }
+      });
+    }
+  };
+
+  const handleRackTypeChange = (newType) => {
+    if (onUpdate) {
+      onUpdate({
+        id: rackId,
+        rackType: newType,
+        sides: {
+          left: { ...sides.left, rackType: newType },
+          right: { ...sides.right, rackType: newType }
         }
       });
     }
@@ -451,10 +518,16 @@ const DoubleRack = ({
     setRackDegree(finalDegree);
     
     if (onUpdate) {
-      onUpdate({
+      const updateData = {
         id: rackId,
-        rackDegree: finalDegree
-      });
+        rackDegree: finalDegree,
+        sides: {
+          left: { ...sides.left },
+          right: { ...sides.right }
+        }
+      };
+      console.log('Sending rack rotation update:', updateData);
+      onUpdate(updateData);
     }
   };
 
@@ -627,18 +700,6 @@ const DoubleRack = ({
       <group position={[0, size.height + 0.3, 0]}>
         {/* Left Side Controls */}
         <group position={[-0.8, 0, 0]}>
-          {/* <Box args={[1.2, 0.4, 0.1]} position={[0, 0, 0]}>
-            <meshStandardMaterial color="#E0E0E0" />
-          </Box>
-          <Text
-            position={[-0.4, 0, 0.06]}
-            fontSize={0.15}
-            color="black"
-            anchorX="center"
-            rotation={[0, Math.PI, 0]}
-          >
-            L
-          </Text> */}
           <ControlButton
             position={[0.62, 0.10, 0]}
             label={hiddenSide === 'left' ? 'L-Show' : 'L-Hide'}
@@ -646,12 +707,7 @@ const DoubleRack = ({
               e.stopPropagation();
               const newHiddenSide = hiddenSide === 'left' ? null : 'left';
               setHiddenSide(newHiddenSide);
-              if (onUpdate) {
-                onUpdate({
-                  id: rackId,
-                  rackType: newHiddenSide === 'left' ? 'r-rack' : 'd-rack'
-                });
-              }
+              handleRackTypeChange(newHiddenSide === 'left' ? 'r-rack' : 'd-rack');
             }}
             color={hiddenSide === 'left' ? '#ff4444' : '#4CAF50'}
             labelColor="black"
@@ -660,17 +716,6 @@ const DoubleRack = ({
 
         {/* Right Side Controls */}
         <group position={[0.8, 0, 0]}>
-          {/* <Box args={[1.2, 0.4, 0.1]} position={[0, 0, 0]}>
-            <meshStandardMaterial color="#E0E0E0" />
-          </Box>
-          <Text
-            position={[0.4, 0, 0.06]}
-            fontSize={0.15}
-            color="black"
-            anchorX="center"
-          >
-            R
-          </Text> */}
           <ControlButton
             position={[-0.62, 0.10, 0]}
             label={hiddenSide === 'right' ? 'R-Show' : 'R-Hide'}
@@ -678,12 +723,7 @@ const DoubleRack = ({
               e.stopPropagation();
               const newHiddenSide = hiddenSide === 'right' ? null : 'right';
               setHiddenSide(newHiddenSide);
-              if (onUpdate) {
-                onUpdate({
-                  id: rackId,
-                  rackType: newHiddenSide === 'right' ? 'l-rack' : 'd-rack'
-                });
-              }
+              handleRackTypeChange(newHiddenSide === 'right' ? 'l-rack' : 'd-rack');
             }}
             color={hiddenSide === 'right' ? '#ff4444' : '#4CAF50'}
             labelColor="black"

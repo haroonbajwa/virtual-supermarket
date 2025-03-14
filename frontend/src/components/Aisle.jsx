@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from '@react-three/drei';
 import DoubleRack from './DoubleRack';
-import { moveRack, rotateRack } from '../utils/Movement';
-import SingleSideRack from './SingleSideRack';
+import { moveRack } from '../utils/Movement';
 
 // Control Button Component
 const ControlButton = ({ position, label, onClick, color = '#4CAF50' }) => (
@@ -76,7 +75,9 @@ const Aisle = ({
   accentColor = '#64B5F6',
   aisleId,
   racks,
-  onRackUpdate
+  onRackUpdate,
+  rotation = [0, 0, 0],
+  highlightedProduct
 }) => {
   const [currentRacks, setCurrentRacks] = useState(racks || Array.from({ length: initialRackCount }, (_, index) => ({
     ...generateRackData(`R${index + 1}`),
@@ -88,7 +89,35 @@ const Aisle = ({
 
   const [currentPosition, setCurrentPosition] = useState(position);
   const [isSelected, setIsSelected] = useState(false);
-  const [currentRotation, setCurrentRotation] = useState(0);
+  const [currentRotation, setCurrentRotation] = useState(rotation[1]);
+
+  useEffect(() => {
+    if (rotation) {
+      setCurrentRotation(rotation[1]);
+    }
+  }, [rotation]);
+
+  useEffect(() => {
+    if (racks) {
+      setCurrentRacks(racks);
+    }
+  }, [racks]);
+
+  useEffect(() => {
+    if (position) {
+      setCurrentPosition(position);
+    }
+  }, [position]);
+
+  useEffect(() => {
+    // Notify parent of position changes
+    if (onRackUpdate) {
+      onRackUpdate({
+        position: currentPosition,
+        aisleId: aisleId
+      });
+    }
+  }, [currentPosition]);
 
   const addRack = (type = 'double') => {
     setCurrentRacks(prevRacks => {
@@ -124,66 +153,95 @@ const Aisle = ({
     }
   };
 
-  const handleRackChange = (rackData) => {
-    console.log('Rack update in Aisle:', rackData);
+  const handleRackChange = (rackId, updatedRackData) => {
+    console.log('Aisle handling rack change:', { rackId, updatedRackData });
     
-    if (rackData.updatedSlot) {
-      // Update the slot in the current racks
-      setCurrentRacks(prevRacks => {
-        const newRacks = prevRacks.map(rack => {
-          if (rack.id === rackData.id) {
-            return {
+    setCurrentRacks(prevRacks => {
+      const updatedRacks = prevRacks.map(rack => {
+        if (rack.id === rackId) {
+          // Handle slot updates
+          if (updatedRackData.updatedSlot) {
+            const { side, shelfIndex, slotIndex, ...slotData } = updatedRackData.updatedSlot;
+            const targetSide = side === 'L' ? 'left' : 'right';
+            
+            // Create deep copy of rack to update
+            const updatedRack = {
               ...rack,
               sides: {
-                left: {
-                  ...rack.sides.left,
-                  shelves: rack.sides.left.shelves.map(shelf => ({
-                    ...shelf,
-                    slots: shelf.slots.map(slot => 
-                      slot.id === rackData.updatedSlot.id ? rackData.updatedSlot : slot
-                    )
-                  }))
-                },
-                right: {
-                  ...rack.sides.right,
-                  shelves: rack.sides.right.shelves.map(shelf => ({
-                    ...shelf,
-                    slots: shelf.slots.map(slot => 
-                      slot.id === rackData.updatedSlot.id ? rackData.updatedSlot : slot
-                    )
-                  }))
+                ...rack.sides,
+                [targetSide]: {
+                  ...rack.sides[targetSide],
+                  shelves: rack.sides[targetSide].shelves.map((shelf, sIndex) => {
+                    if (sIndex === shelfIndex) {
+                      return {
+                        ...shelf,
+                        slots: shelf.slots.map((slot, slIndex) => {
+                          if (slIndex === slotIndex) {
+                            return {
+                              ...slot,
+                              ...slotData
+                            };
+                          }
+                          return slot;
+                        })
+                      };
+                    }
+                    return shelf;
+                  })
                 }
               }
             };
+            return updatedRack;
           }
-          return rack;
-        });
-        
-        console.log('Updated racks in Aisle:', newRacks);
-        return newRacks;
-      });
-    }
 
-    // Pass the update to the parent
-    if (onRackUpdate) {
-      onRackUpdate(aisleId, rackData);
-    }
+          // Handle position updates
+          if (updatedRackData.position) {
+            return {
+              ...rack,
+              position: updatedRackData.position,
+              rackDegree: rack.rackDegree,
+              rackType: rack.rackType,
+              sides: rack.sides,
+              color: rack.color
+            };
+          }
+
+          // Handle other updates
+          return {
+            ...rack,
+            ...updatedRackData
+          };
+        }
+        return rack;
+      });
+
+      console.log('Aisle sending updated racks:', updatedRacks);
+      
+      if (onRackUpdate) {
+        onRackUpdate({
+          aisleId: aisleId,
+          racks: updatedRacks
+        });
+      }
+      
+      return updatedRacks;
+    });
   };
 
   const handleRotate = () => {
-    const newRotation = rotateRack(currentRotation);
-    setCurrentRotation(newRotation);
+    // Calculate the next rotation in degrees
+    const currentDegrees = (currentRotation * 180 / Math.PI) % 360;
+    const nextDegrees = (currentDegrees + 90) % 360;
+    const finalDegree = nextDegrees === 0 ? 360 : nextDegrees;
     
-    // Calculate degrees based on rotation
-    const degrees = (newRotation * 180 / Math.PI) % 360;
-    const rotationDegree = Math.round(degrees / 90) * 90;
-    const finalDegree = rotationDegree === 0 ? 360 : rotationDegree;
+    // Convert back to radians for Three.js
+    const newRotation = (nextDegrees * Math.PI / 180);
+    setCurrentRotation(newRotation);
     
     console.log("Rotating aisle:", aisleId, "to degree:", finalDegree);
     
     if (onRackUpdate) {
       onRackUpdate({
-        id: aisleId,
         aisleDegree: finalDegree
       });
     }
@@ -320,14 +378,17 @@ const Aisle = ({
       {/* Racks */}
       <group>
         {currentRacks.map((rack, index) => (
-          <group key={rack.id} position={[index * rackSpacing, 0, 0]}>
+          <group key={rack.id}>
             <DoubleRack
-              position={[0, 0, 0]}
-              size={rack.size}
-              color={rack.color}
+              position={rack.position}
+              size={rack.size || { width: 2, depth: 1, height: 3 }}
+              color={rack.color || accentColor}
               rackId={rack.id}
               sides={rack.sides}
-              onUpdate={handleRackChange}
+              rackType={rack.rackType || 'd-rack'}
+              onUpdate={(rackData) => handleRackChange(rack.id, rackData)}
+              rotation={rack.rackDegree ? (rack.rackDegree * Math.PI / 180) : 0}
+              highlightedProduct={highlightedProduct && highlightedProduct.rackId === rack.id ? highlightedProduct : null}
             />
           </group>
         ))}

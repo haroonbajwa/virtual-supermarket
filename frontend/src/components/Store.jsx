@@ -9,6 +9,7 @@ import {
 } from '@react-three/drei';
 import Aisle from './Aisle';
 import { layoutService } from '../services/layout.service';
+import SearchBar from './SearchBar';
 
 // Realistic color palette
 const colors = {
@@ -134,6 +135,11 @@ const Store = () => {
   const [layouts, setLayouts] = useState([]);
   const [selectedLayout, setSelectedLayout] = useState(null);
   const [layoutName, setLayoutName] = useState('');
+  const [pendingChanges, setPendingChanges] = useState(false);
+  const [searchResult, setSearchResult] = useState({ visible: false, message: '', isSuccess: false });
+  const [highlightedProduct, setHighlightedProduct] = useState(null);
+  const cameraRef = useRef();
+  const controlsRef = useRef();
 
   console.log(aisles, "aisles state")
 
@@ -160,18 +166,46 @@ const Store = () => {
     try {
       const layoutData = {
         name: layoutName,
-        aisles: aisles
+        aisles: aisles.map(aisle => {
+          console.log('Saving aisle:', aisle);
+          return {
+            ...aisle,
+            aisleDegree: aisle.aisleDegree || 360,
+            racks: (aisle.racks || []).map(rack => {
+              console.log('Saving rack:', rack);
+              return {
+                ...rack,
+                rackDegree: rack.rackDegree !== undefined ? rack.rackDegree : 360,
+                sides: {
+                  left: {
+                    ...rack.sides.left,
+                    shelves: (rack.sides.left.shelves || []).map(shelf => ({
+                      ...shelf,
+                      slots: shelf.slots || []
+                    }))
+                  },
+                  right: {
+                    ...rack.sides.right,
+                    shelves: (rack.sides.right.shelves || []).map(shelf => ({
+                      ...shelf,
+                      slots: shelf.slots || []
+                    }))
+                  }
+                }
+              };
+            })
+          };
+        })
       };
 
+      console.log('Saving layout with data:', layoutData);
+
       if (selectedLayout) {
-        // Update existing layout
         await layoutService.updateLayout(selectedLayout._id, layoutData);
       } else {
-        // Save new layout
         await layoutService.saveLayout(layoutData);
       }
 
-      // Refresh layouts list
       await loadLayouts();
       setLayoutName('');
       setSelectedLayout(null);
@@ -183,19 +217,57 @@ const Store = () => {
   };
 
   const handleLoadLayout = async (layout) => {
-    if (selectedLayout) {
-      setSelectedLayout(null)
-    }
-    else {
-      try {
-        const loadedLayout = await layoutService.getLayout(layout._id);
-        setAisles(loadedLayout.aisles);
+    try {
+      console.log('Loading layout:', layout);
+      const loadedLayout = await layoutService.getLayout(layout._id);
+      console.log('Raw loaded layout data:', loadedLayout);
+      
+      if (loadedLayout && loadedLayout.aisles) {
+        const processedAisles = loadedLayout.aisles.map(aisle => {
+          console.log('Processing aisle:', aisle);
+          return {
+            ...aisle,
+            aisleDegree: aisle.aisleDegree || 360,
+            racks: (aisle.racks || []).map(rack => {
+              console.log('Processing rack:', rack);
+              return {
+                ...rack,
+                rackType: rack.rackType || 'd-rack',
+                rackDegree: rack.rackDegree !== undefined ? rack.rackDegree : 360,
+                sides: {
+                  left: {
+                    ...rack.sides.left,
+                    shelves: (rack.sides.left.shelves || []).map(shelf => ({
+                      ...shelf,
+                      slots: shelf.slots || []
+                    }))
+                  },
+                  right: {
+                    ...rack.sides.right,
+                    shelves: (rack.sides.right.shelves || []).map(shelf => ({
+                      ...shelf,
+                      slots: shelf.slots || []
+                    }))
+                  }
+                },
+                size: rack.size || { width: 2, depth: 1, height: 3 },
+                color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
+              };
+            })
+          };
+        });
+        
+        console.log('Final processed aisles:', processedAisles);
+        setAisles(processedAisles);
         setSelectedLayout(layout);
         setLayoutName(layout.name);
-      } catch (error) {
-        console.error('Error loading layout:', error);
-        alert('Error loading layout. Please try again.');
+      } else {
+        console.error('No aisles found in loaded layout');
+        setAisles([]);
       }
+    } catch (error) {
+      console.error('Error loading layout:', error);
+      alert('Error loading layout. Please try again.');
     }
   };
 
@@ -284,216 +356,141 @@ const Store = () => {
     }
   };
 
+  const handleUpdateLayout = () => {
+    if (selectedLayout && pendingChanges) {
+      console.log('Manually updating layout with current aisles');
+      layoutService.updateLayout(selectedLayout._id, {
+        ...selectedLayout,
+        aisles: aisles
+      }).then(() => {
+        console.log('Layout updated successfully');
+        setPendingChanges(false);
+      }).catch(error => {
+        console.error('Error updating layout:', error);
+      });
+    }
+  };
+
   const updateRackData = (aisleId, rackData) => {
-    console.log('Updating rack data:', rackData);
-
-    if (rackData.action === 'add' || rackData.action === 'delete') {
-      // Handle rack addition or deletion
-      setAisles(prevAisles =>
-        prevAisles.map(aisle =>
-          aisle.id === aisleId
-            ? {
+    console.log('Store updating rack data:', { aisleId, rackData });
+    
+    setAisles(prevAisles => {
+      const updatedAisles = prevAisles.map(aisle => {
+        if (aisle.id === aisleId) {
+          // Handle aisle position update
+          if (rackData.position) {
+            console.log('Updating aisle position:', rackData.position);
+            const updatedAisle = {
               ...aisle,
-              racks: rackData.racks.map((rack, index) => ({
-                id: `A${aisleId}-R${index + 1}`,
-                position: [index * 3, 0, 0],
-                rackType: rack.rackType || 'd-rack', // Preserve or set default rack type
-                sides: {
-                  left: {
-                    ...rack.sides.left,
-                    shelves: Array.from({ length: rack.sides.left.shelvesCount }, (_, shelfIndex) => ({
-                      id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}`,
-                      slots: Array.from({ length: rack.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                        id: `A${aisleId}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                        productId: `P${Math.floor(Math.random() * 1000)}`,
-                        productName: `Product ${Math.floor(Math.random() * 100)}`,
-                        description: `Description for product`,
-                        price: (Math.random() * 100).toFixed(2),
-                        quantity: Math.floor(Math.random() * 50)
-                      }))
-                    }))
+              id: aisle.id,
+              aisleDegree: aisle.aisleDegree || 360,
+              position: rackData.position,
+              racks: aisle.racks || []
+            };
+            setPendingChanges(true);
+            return updatedAisle;
+          }
+
+          // Handle aisle rotation
+          if (rackData.aisleDegree !== undefined) {
+            console.log('Rotating aisle to:', rackData.aisleDegree);
+            const updatedAisle = {
+              ...aisle,
+              aisleDegree: rackData.aisleDegree
+            };
+            setPendingChanges(true);
+            return updatedAisle;
+          }
+          
+          // Handle rack updates
+          if (rackData.racks) {
+            console.log('Store handling rack update:', rackData.racks);
+            const updatedAisle = {
+              ...aisle,
+              racks: rackData.racks.map(rack => {
+                const updatedRack = {
+                  ...rack,
+                  id: rack.id,
+                  position: rack.position,
+                  rackDegree: rack.rackDegree,
+                  rackType: rack.rackType || 'd-rack',
+                  sides: rack.sides || {
+                    left: { shelves: [] },
+                    right: { shelves: [] }
                   },
-                  right: {
-                    ...rack.sides.right,
-                    shelves: Array.from({ length: rack.sides.right.shelvesCount }, (_, shelfIndex) => ({
-                      id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}`,
-                      slots: Array.from({ length: rack.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                        id: `A${aisleId}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                        productId: `P${Math.floor(Math.random() * 1000)}`,
-                        productName: `Product ${Math.floor(Math.random() * 100)}`,
-                        description: `Description for product`,
-                        price: (Math.random() * 100).toFixed(2),
-                        quantity: Math.floor(Math.random() * 50)
-                      }))
-                    }))
-                  }
-                },
-                size: { width: 2, depth: 1, height: 3 },
-                color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
-              }))
-            }
-            : aisle
-        )
-      );
-    } else if (rackData.rackType) {
-      // Handle rack type updates
-      setAisles(prevAisles =>
-        prevAisles.map(aisle =>
-          aisle.id === aisleId
-            ? {
-              ...aisle,
-              racks: aisle.racks.map(rack =>
-                rack.id === rackData.id
-                  ? {
-                    ...rack,
-                    rackType: rackData.rackType
-                  }
-                  : rack
-              )
-            }
-            : aisle
-        )
-      );
-    } else if (rackData.updatedSlot) {
-      // Handle slot updates from SlotForm
-      console.log('Updating slot in Store:', rackData.updatedSlot);
+                  size: rack.size || { width: 2, depth: 1, height: 3 },
+                  color: rack.color || "hsl(263.1184617437402, 70%, 60%)"
+                };
+                console.log('Updated rack with data:', updatedRack);
+                return updatedRack;
+              })
+            };
+            setPendingChanges(true);
+            return updatedAisle;
+          }
 
-      setAisles(prevAisles => {
-        const newAisles = prevAisles.map(aisle => {
-          if (aisle.id === aisleId) {
-            console.log('Found matching aisle:', aisle.id);
-            return {
+          // Handle single rack update
+          if (rackData.id) {
+            const updatedAisle = {
               ...aisle,
               racks: aisle.racks.map(rack => {
                 if (rack.id === rackData.id) {
-                  console.log('Found matching rack:', rack.id);
-                  return {
-                    ...rack,
-                    sides: {
-                      left: {
-                        ...rack.sides.left,
-                        shelves: rack.sides.left.shelves.map(shelf => ({
-                          ...shelf,
-                          slots: shelf.slots.map(slot => {
-                            if (slot.id === rackData.updatedSlot.id) {
-                              console.log('Updating slot:', slot.id, 'with:', rackData.updatedSlot);
-                              return rackData.updatedSlot;
-                            }
-                            return slot;
-                          })
-                        }))
-                      },
-                      right: {
-                        ...rack.sides.right,
-                        shelves: rack.sides.right.shelves.map(shelf => ({
-                          ...shelf,
-                          slots: shelf.slots.map(slot => {
-                            if (slot.id === rackData.updatedSlot.id) {
-                              console.log('Updating slot:', slot.id, 'with:', rackData.updatedSlot);
-                              return rackData.updatedSlot;
-                            }
-                            return slot;
-                          })
-                        }))
+                  let updatedRack = { ...rack };
+                  
+                  // Update position if provided
+                  if (rackData.position) {
+                    console.log('Updating rack position:', rackData.position);
+                    updatedRack = {
+                      ...updatedRack,
+                      position: rackData.position
+                    };
+                  }
+
+                  // Handle slot updates
+                  if (rackData.updatedSlot) {
+                    const { side, shelfIndex, slotIndex, ...slotData } = rackData.updatedSlot;
+                    const targetSide = side === 'L' ? 'left' : 'right';
+                    
+                    updatedRack.sides = {
+                      ...rack.sides,
+                      [targetSide]: {
+                        ...rack.sides[targetSide],
+                        shelves: rack.sides[targetSide].shelves.map((shelf, sIndex) => {
+                          if (sIndex === shelfIndex) {
+                            return {
+                              ...shelf,
+                              slots: shelf.slots.map((slot, slIndex) => {
+                                if (slIndex === slotIndex) {
+                                  return {
+                                    ...slot,
+                                    ...slotData
+                                  };
+                                }
+                                return slot;
+                              })
+                            };
+                          }
+                          return shelf;
+                        })
                       }
-                    }
-                  };
+                    };
+                  }
+                  return updatedRack;
                 }
                 return rack;
               })
             };
+            setPendingChanges(true);
+            return updatedAisle;
           }
-          return aisle;
-        });
-
-        console.log('Updated aisle structure:', newAisles);
-        return newAisles;
+        }
+        return aisle;
       });
-    } else if (rackData.rackDegree !== undefined) {
-      // Handle rack degree updates
-      console.log("Updating rack degree for id:", rackData.id);
-      setAisles(prevAisles => {
-        const newAisles = prevAisles.map(aisle => ({
-          ...aisle,
-          racks: aisle.racks.map(rack =>
-            rack.id === rackData.id
-              ? {
-                ...rack,
-                rackDegree: rackData.rackDegree
-              }
-              : rack
-          )
-        }));
-        console.log("New aisles:", newAisles);
-        return newAisles;
-      });
-    } else if (rackData.aisleDegree !== undefined) {
-      // Handle aisle degree updates
-      console.log("Updating aisle degree for id:", aisleId);
-      setAisles(prevAisles => {
-        const newAisles = prevAisles.map(aisle =>
-          aisle.id === aisleId
-            ? {
-              ...aisle,
-              aisleDegree: rackData.aisleDegree
-            }
-            : aisle
-        );
-        console.log("New aisles:", newAisles);
-        return newAisles;
-      });
-    } else {
-      // Handle other rack updates (shelf/slot structure changes)
-      setAisles(prevAisles =>
-        prevAisles.map(aisle =>
-          aisle.id === aisleId
-            ? {
-              ...aisle,
-              racks: aisle.racks.map(rack =>
-                rack.id === rackData.id
-                  ? {
-                    ...rack,
-                    sides: {
-                      left: {
-                        ...rackData.sides.left,
-                        shelves: Array.from({ length: rackData.sides.left.shelvesCount }, (_, shelfIndex) => ({
-                          id: `${rackData.id}-L-SH${shelfIndex + 1}`,
-                          slots: Array.from({ length: rackData.sides.left.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                            id: `${rackData.id}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                            productId: `P${Math.floor(Math.random() * 1000)}`,
-                            productName: `Product ${Math.floor(Math.random() * 100)}`,
-                            description: `Description for product`,
-                            price: (Math.random() * 100).toFixed(2),
-                            quantity: Math.floor(Math.random() * 50)
-                          }))
-                        }))
-                      },
-                      right: {
-                        ...rackData.sides.right,
-                        shelves: Array.from({ length: rackData.sides.right.shelvesCount }, (_, shelfIndex) => ({
-                          id: `${rackData.id}-R-SH${shelfIndex + 1}`,
-                          slots: Array.from({ length: rackData.sides.right.slotsPerShelf[shelfIndex] }, (_, slotIndex) => ({
-                            id: `${rackData.id}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`,
-                            productId: `P${Math.floor(Math.random() * 1000)}`,
-                            productName: `Product ${Math.floor(Math.random() * 100)}`,
-                            description: `Description for product`,
-                            price: (Math.random() * 100).toFixed(2),
-                            quantity: Math.floor(Math.random() * 50)
-                          }))
-                        }))
-                      }
-                    }
-                  }
-                  : rack
-              )
-            }
-            : aisle
-        )
-      );
-    }
+      
+      console.log('Store updated aisles:', updatedAisles);
+      return updatedAisles;
+    });
   };
-
-  console.log(aisles);
 
   const handlePlaneClick = (event) => {
     if (isPlacingRegularAisle) {
@@ -560,6 +557,171 @@ const Store = () => {
   const handleAisleClick = (event, aisleId) => {
     event.stopPropagation();
     setSelectedAisle(aisleId);
+  };
+
+  const handleSearch = (searchTerm) => {
+    console.log('Searching for:', searchTerm);
+    const term = searchTerm.toLowerCase();
+    let found = false;
+    
+    // Clear any previous highlighted product
+    setHighlightedProduct(null);
+
+    // Search through all aisles, racks, shelves, and slots
+    for (const aisle of aisles) {
+      if (!aisle.racks) continue;
+      
+      for (const rack of aisle.racks) {
+        // Search in left side
+        if (rack.sides && rack.sides.left && rack.sides.left.shelves) {
+          for (const shelf of rack.sides.left.shelves) {
+            if (shelf.slots) {
+              for (const slot of shelf.slots) {
+                if (slot.productName && 
+                    slot.productName.toLowerCase().includes(term)) {
+                  found = true;
+                  // Set the highlighted product with all necessary information
+                  setHighlightedProduct({
+                    aisleId: aisle.id,
+                    rackId: rack.id,
+                    side: 'left',
+                    shelfIndex: rack.sides.left.shelves.indexOf(shelf),
+                    slotIndex: shelf.slots.indexOf(slot),
+                    slotId: slot.id,
+                    productName: slot.productName
+                  });
+                  setSearchResult({
+                    visible: true,
+                    message: `Found: ${slot.productName}`,
+                    isSuccess: true
+                  });
+                  focusCameraOnRack(aisle.id, rack.id, 'left');
+                  return; // Exit after finding the first match
+                }
+              }
+            }
+          }
+        }
+
+        // Search in right side
+        if (rack.sides && rack.sides.right && rack.sides.right.shelves) {
+          for (const shelf of rack.sides.right.shelves) {
+            if (shelf.slots) {
+              for (const slot of shelf.slots) {
+                if (slot.productName && 
+                    slot.productName.toLowerCase().includes(term)) {
+                  found = true;
+                  // Set the highlighted product with all necessary information
+                  setHighlightedProduct({
+                    aisleId: aisle.id,
+                    rackId: rack.id,
+                    side: 'right',
+                    shelfIndex: rack.sides.right.shelves.indexOf(shelf),
+                    slotIndex: shelf.slots.indexOf(slot),
+                    slotId: slot.id,
+                    productName: slot.productName
+                  });
+                  setSearchResult({
+                    visible: true,
+                    message: `Found: ${slot.productName}`,
+                    isSuccess: true
+                  });
+                  focusCameraOnRack(aisle.id, rack.id, 'right');
+                  return; // Exit after finding the first match
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If product not found
+    if (!found) {
+      setSearchResult({
+        visible: true,
+        message: `"${searchTerm}" does not exist`,
+        isSuccess: false
+      });
+    }
+    
+    // Hide search result after 3 seconds
+    setTimeout(() => {
+      setSearchResult({ visible: false, message: '', isSuccess: false });
+    }, 3000);
+  };
+
+  // Function to focus camera on a specific rack when a product is found
+  const focusCameraOnRack = (aisleId, rackId, side) => {
+    // Find the aisle and rack
+    const aisle = aisles.find(a => a.id === aisleId);
+    if (!aisle || !aisle.racks) return;
+    
+    const rackIndex = aisle.racks.findIndex(r => r.id === rackId);
+    if (rackIndex === -1) return;
+    
+    const rack = aisle.racks[rackIndex];
+    
+    // Calculate the position to focus on
+    const aislePosition = aisle.position;
+    const rackPosition = [aislePosition[0] + rackIndex * 3, aislePosition[1], aislePosition[2]];
+    
+    // Adjust position based on the side (left or right)
+    const sideOffset = side === 'left' ? -0.5 : 0.5;
+    
+    // Calculate rotation to face the correct side of the rack
+    const rackRotation = rack.rackDegree ? (rack.rackDegree * Math.PI / 180) : 0;
+    
+    // Calculate camera position based on rack position, side, and rotation
+    const distance = 5; // Increased distance to show the full rack
+    const height = 2.5;   // Slightly increased height for better view
+    
+    // Calculate position with rotation consideration
+    // For left side, we want to look at it head-on, so rotate 180 degrees
+    // For right side, we look at it directly
+    const angleFacing = rackRotation + (side === 'left' ? Math.PI : 0);
+    const cameraX = rackPosition[0] + Math.sin(angleFacing) * distance;
+    const cameraZ = rackPosition[2] + Math.cos(angleFacing) * distance;
+    
+    // Set camera position and target
+    if (cameraRef.current && controlsRef.current) {
+      // Animate camera movement to the new position
+      const duration = 1000; // Animation duration in ms
+      const startTime = Date.now();
+      const startPosition = [...cameraRef.current.position];
+      const targetPosition = [cameraX, rackPosition[1] + height, cameraZ];
+      const startTarget = [...controlsRef.current.target];
+      // Target the center of the rack for better viewing
+      const targetTarget = [rackPosition[0], rackPosition[1] + 1.5, rackPosition[2]];
+      
+      const animateCamera = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-in-out function for smoother animation
+        const easeProgress = progress < 0.5 
+          ? 2 * progress * progress 
+          : -1 + (4 - 2 * progress) * progress;
+        
+        // Update camera position
+        cameraRef.current.position.x = startPosition[0] + (targetPosition[0] - startPosition[0]) * easeProgress;
+        cameraRef.current.position.y = startPosition[1] + (targetPosition[1] - startPosition[1]) * easeProgress;
+        cameraRef.current.position.z = startPosition[2] + (targetPosition[2] - startPosition[2]) * easeProgress;
+        
+        // Update controls target
+        controlsRef.current.target.set(
+          startTarget[0] + (targetTarget[0] - startTarget[0]) * easeProgress,
+          startTarget[1] + (targetTarget[1] - startTarget[1]) * easeProgress,
+          startTarget[2] + (targetTarget[2] - startTarget[2]) * easeProgress
+        );
+        
+        if (progress < 1) {
+          requestAnimationFrame(animateCamera);
+        }
+      };
+      
+      animateCamera();
+    }
   };
 
   return (
@@ -757,7 +919,47 @@ const Store = () => {
             </div>
           ))}
         </div>
+        {selectedLayout && (
+          <button
+            onClick={handleUpdateLayout}
+            style={{
+              padding: '8px 15px',
+              backgroundColor: '#4CAF50',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              width: '100%',
+              marginTop: '10px'
+            }}
+          >
+            Update Layout
+          </button>
+        )}
       </div>
+
+      {/* Search Bar */}
+      <SearchBar onSearch={handleSearch} />
+
+      {/* Search Result Notification */}
+      {searchResult.visible && (
+        <div style={{
+          position: 'fixed',
+          bottom: '30px',
+          left: '30px',
+          padding: '12px 20px',
+          backgroundColor: searchResult.isSuccess ? 'rgba(46, 125, 50, 0.9)' : 'rgba(198, 40, 40, 0.9)',
+          color: 'white',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          zIndex: 1000,
+          fontSize: '16px',
+          maxWidth: '80%',
+          transition: 'all 0.3s ease'
+        }}>
+          {searchResult.message}
+        </div>
+      )}
 
       <Canvas
         camera={{ position: [15, 15, 15], fov: 50 }}
@@ -772,8 +974,9 @@ const Store = () => {
           powerPreference: 'high-performance'
         }}
       >
-        <PerspectiveCamera makeDefault position={[15, 15, 15]} />
+        <PerspectiveCamera makeDefault ref={cameraRef} position={[15, 15, 15]} />
         <OrbitControls
+          ref={controlsRef}
           target={[5, 0, 5]}
           maxPolarAngle={Math.PI / 2.1}
           enableDamping
@@ -845,12 +1048,14 @@ const Store = () => {
           >
             <Aisle
               position={aisle.position}
-              initialRackCount={3}
+              initialRackCount={aisle.racks?.length || 3}
               rackSpacing={3}
               accentColor={selectedAisle === aisle.id ? '#4CAF50' : colors.accent[index % colors.accent.length]}
               aisleId={aisle.id}
               racks={aisle.racks}
-              onRackUpdate={(data) => updateRackData(aisle.id, data)}
+              onRackUpdate={(rackData) => updateRackData(aisle.id, rackData)}
+              rotation={[0, aisle.aisleDegree ? (aisle.aisleDegree * Math.PI / 180) : 0, 0]}
+              highlightedProduct={highlightedProduct && highlightedProduct.aisleId === aisle.id ? highlightedProduct : null}
             />
           </group>
         ))}
