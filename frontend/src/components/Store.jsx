@@ -9,6 +9,7 @@ import {
 import Aisle from './Aisle';
 import { layoutService } from '../services/layout.service';
 import SearchBar from './SearchBar';
+import Sidebar from './Sidebar';
 
 // Realistic color palette
 const colors = {
@@ -137,6 +138,7 @@ const Store = () => {
   const [pendingChanges, setPendingChanges] = useState(false);
   const [searchResult, setSearchResult] = useState({ visible: false, message: '', isSuccess: false });
   const [highlightedProduct, setHighlightedProduct] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const cameraRef = useRef();
   const controlsRef = useRef();
 
@@ -162,130 +164,92 @@ const Store = () => {
       return;
     }
 
+    setIsLoading(true);
     try {
-      const layoutData = {
-        name: layoutName,
-        aisles: aisles.map(aisle => {
-          console.log('Saving aisle:', aisle);
-          return {
-            ...aisle,
-            aisleDegree: aisle.aisleDegree || 360,
-            racks: (aisle.racks || []).map(rack => {
-              console.log('Saving rack:', rack);
-              return {
-                ...rack,
-                rackDegree: rack.rackDegree !== undefined ? rack.rackDegree : 360,
-                sides: {
-                  left: {
-                    ...rack.sides.left,
-                    shelves: (rack.sides.left.shelves || []).map(shelf => ({
-                      ...shelf,
-                      slots: shelf.slots || []
-                    }))
-                  },
-                  right: {
-                    ...rack.sides.right,
-                    shelves: (rack.sides.right.shelves || []).map(shelf => ({
-                      ...shelf,
-                      slots: shelf.slots || []
-                    }))
-                  }
-                }
-              };
-            })
-          };
-        })
-      };
-
-      console.log('Saving layout with data:', layoutData);
-
       if (selectedLayout) {
-        await layoutService.updateLayout(selectedLayout._id, layoutData);
+        await layoutService.updateLayout(selectedLayout._id, {
+          ...selectedLayout,
+          name: layoutName,
+          aisles: aisles
+        });
+        const updatedLayouts = layouts.map(l => 
+          l._id === selectedLayout._id 
+            ? { ...l, name: layoutName }
+            : l
+        );
+        setLayouts(updatedLayouts);
+        alert('Layout updated successfully!');
       } else {
-        await layoutService.saveLayout(layoutData);
+        const newLayout = await layoutService.createLayout({
+          name: layoutName,
+          aisles: aisles
+        });
+        setLayouts([...layouts, newLayout]);
+        setSelectedLayout(newLayout);
+        alert('Layout saved successfully!');
       }
-
-      await loadLayouts();
-      setLayoutName('');
-      setSelectedLayout(null);
-      alert('Layout saved successfully!');
+      setPendingChanges(false);
     } catch (error) {
       console.error('Error saving layout:', error);
-      alert('Error saving layout. Please try again.');
+      alert('Failed to save layout. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleLoadLayout = async (layout) => {
+    if (pendingChanges && !window.confirm('You have unsaved changes. Do you want to proceed and lose these changes?')) {
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      console.log('Loading layout:', layout);
       const loadedLayout = await layoutService.getLayout(layout._id);
-      console.log('Raw loaded layout data:', loadedLayout);
-      
-      if (loadedLayout && loadedLayout.aisles) {
-        const processedAisles = loadedLayout.aisles.map(aisle => {
-          console.log('Processing aisle:', aisle);
-          return {
-            ...aisle,
-            aisleDegree: aisle.aisleDegree || 360,
-            racks: (aisle.racks || []).map(rack => {
-              console.log('Processing rack:', rack);
-              return {
-                ...rack,
-                rackType: rack.rackType || 'd-rack',
-                rackDegree: rack.rackDegree !== undefined ? rack.rackDegree : 360,
-                sides: {
-                  left: {
-                    ...rack.sides.left,
-                    shelves: (rack.sides.left.shelves || []).map(shelf => ({
-                      ...shelf,
-                      slots: shelf.slots || []
-                    }))
-                  },
-                  right: {
-                    ...rack.sides.right,
-                    shelves: (rack.sides.right.shelves || []).map(shelf => ({
-                      ...shelf,
-                      slots: shelf.slots || []
-                    }))
-                  }
-                },
-                size: rack.size || { width: 2, depth: 1, height: 3 },
-                color: rack.color || `hsl(${Math.random() * 360}, 70%, 60%)`
-              };
-            })
-          };
-        });
-        
-        console.log('Final processed aisles:', processedAisles);
-        setAisles(processedAisles);
-        setSelectedLayout(layout);
-        setLayoutName(layout.name);
-      } else {
-        console.error('No aisles found in loaded layout');
-        setAisles([]);
-      }
+      setAisles(loadedLayout.aisles);
+      setSelectedLayout(loadedLayout);
+      setLayoutName(loadedLayout.name);
+      setPendingChanges(false);
     } catch (error) {
       console.error('Error loading layout:', error);
-      alert('Error loading layout. Please try again.');
+      alert('Failed to load layout. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteLayout = async (layout) => {
-    if (!window.confirm('Are you sure you want to delete this layout?')) {
+    if (!window.confirm(`Are you sure you want to delete the layout "${layout.name}"?`)) {
       return;
     }
 
+    setIsLoading(true);
     try {
       await layoutService.deleteLayout(layout._id);
-      await loadLayouts();
+      setLayouts(layouts.filter(l => l._id !== layout._id));
       if (selectedLayout?._id === layout._id) {
         setSelectedLayout(null);
         setLayoutName('');
       }
-      alert('Layout deleted successfully!');
     } catch (error) {
       console.error('Error deleting layout:', error);
-      alert('Error deleting layout. Please try again.');
+      alert('Failed to delete layout. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateLayout = () => {
+    if (selectedLayout && pendingChanges) {
+      console.log('Manually updating layout with current aisles');
+      layoutService.updateLayout(selectedLayout._id, {
+        ...selectedLayout,
+        aisles: aisles
+      }).then(() => {
+        console.log('Layout updated successfully');
+        setPendingChanges(false);
+      }).catch(error => {
+        console.error('Error updating layout:', error);
+      });
     }
   };
 
@@ -352,21 +316,6 @@ const Store = () => {
     if (selectedAisle !== null) {
       setAisles(prevAisles => prevAisles.filter(aisle => aisle.id !== selectedAisle));
       setSelectedAisle(null);
-    }
-  };
-
-  const handleUpdateLayout = () => {
-    if (selectedLayout && pendingChanges) {
-      console.log('Manually updating layout with current aisles');
-      layoutService.updateLayout(selectedLayout._id, {
-        ...selectedLayout,
-        aisles: aisles
-      }).then(() => {
-        console.log('Layout updated successfully');
-        setPendingChanges(false);
-      }).catch(error => {
-        console.error('Error updating layout:', error);
-      });
     }
   };
 
@@ -734,70 +683,20 @@ const Store = () => {
       background: colors.background,
       fontFamily: 'Roboto, Arial, sans-serif'
     }}>
-      {/* Controls Panel */}
+      {/* Instructions Box */}
       <div style={{
         position: 'absolute',
         top: '20px',
         left: '20px',
         zIndex: 1000,
         padding: '20px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
         borderRadius: '12px',
         boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-        backdropFilter: 'blur(10px)'
+        color: 'white',
+        maxWidth: '300px'
       }}>
-        <h2 style={{
-          margin: '0 0 15px 0',
-          color: colors.accent[0],
-          borderBottom: `2px solid ${colors.accent[1]}`,
-          paddingBottom: '10px',
-          fontSize: '1.5rem',
-          fontWeight: '600'
-        }}>
-          Superstore Layout Designer
-        </h2>
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setIsPlacingRegularAisle(true)}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: isPlacingRegularAisle ? '#4CAF50' : colors.accent[1],
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-            }}
-            onMouseOver={(e) => e.target.style.transform = 'translateY(-2px)'}
-            onMouseOut={(e) => e.target.style.transform = 'translateY(0)'}
-          >
-            {isPlacingRegularAisle ? 'Click to Place Regular Aisle' : 'Add Regular Aisle'}
-          </button>
-          <button
-            onClick={removeSelectedAisle}
-            disabled={selectedAisle === null}
-            style={{
-              padding: '12px 24px',
-              backgroundColor: selectedAisle !== null ? '#f44336' : '#9e9e9e',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: selectedAisle !== null ? 'pointer' : 'not-allowed',
-              fontSize: '14px',
-              fontWeight: '500',
-              transition: 'all 0.3s ease',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-              opacity: selectedAisle !== null ? 1 : 0.7
-            }}
-            onMouseOver={(e) => selectedAisle !== null && (e.target.style.transform = 'translateY(-2px)')}
-            onMouseOut={(e) => selectedAisle !== null && (e.target.style.transform = 'translateY(0)')}
-          >
-            Delete Selected Aisle
-          </button>
-        </div>
+        <h3 style={{ marginBottom: '15px' }}>Instructions</h3>
         <div style={{
           marginTop: '20px',
           fontSize: '14px',
@@ -813,132 +712,25 @@ const Store = () => {
               Click anywhere on the floor to place the aisle
             </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[1] }}></div>
-            Click aisle to select/deselect
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[2] }}></div>
-            Use B+/B- to adjust product boxes
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: colors.accent[0] }}></div>
-            Drag to rotate, scroll to zoom
-          </div>
         </div>
       </div>
 
-      {/* Layout Controls */}
-      <div style={{
-        position: 'absolute',
-        top: '20px',
-        right: '20px',
-        zIndex: 1000,
-        padding: '20px',
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
-        color: 'white',
-        width: '300px'
-      }}>
-        <h3 style={{ marginBottom: '15px' }}>Layout Controls</h3>
-
-        {/* Save Layout */}
-        <div style={{ marginBottom: '15px' }}>
-          <input
-            type="text"
-            value={layoutName}
-            onChange={(e) => setLayoutName(e.target.value)}
-            placeholder="Enter layout name"
-            style={{
-              padding: '8px',
-              marginRight: '10px',
-              borderRadius: '4px',
-              border: '1px solid #ccc',
-              width: '100%',
-              marginBottom: '10px'
-            }}
-          />
-          <button
-            onClick={handleSaveLayout}
-            style={{
-              padding: '8px 15px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              width: '100%'
-            }}
-          >
-            {selectedLayout ? 'Update Layout' : 'Save Layout'}
-          </button>
-        </div>
-
-        {/* Layouts List */}
-        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-          <h4 style={{ marginBottom: '10px' }}>Saved Layouts</h4>
-          {layouts.map(layout => (
-            <div
-              key={layout._id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                marginBottom: '8px',
-                padding: '8px',
-                backgroundColor: selectedLayout?._id === layout._id ? '#2196F3' : '#333',
-                borderRadius: '4px'
-              }}
-            >
-              <span style={{ flex: 1 }}>{layout.name}</span>
-              <button
-                onClick={() => handleLoadLayout(layout)}
-                style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#2196F3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  marginRight: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                Load
-              </button>
-              <button
-                onClick={() => handleDeleteLayout(layout)}
-                style={{
-                  padding: '4px 8px',
-                  backgroundColor: '#f44336',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                Delete
-              </button>
-            </div>
-          ))}
-        </div>
-        {selectedLayout && (
-          <button
-            onClick={handleUpdateLayout}
-            style={{
-              padding: '8px 15px',
-              backgroundColor: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              width: '100%',
-              marginTop: '10px'
-            }}
-          >
-            Update Layout
-          </button>
-        )}
-      </div>
+      {/* Sidebar with Layout Controls and Designer */}
+      <Sidebar
+        layoutName={layoutName}
+        setLayoutName={setLayoutName}
+        layouts={layouts}
+        selectedLayout={selectedLayout}
+        handleSaveLayout={handleSaveLayout}
+        handleLoadLayout={handleLoadLayout}
+        handleDeleteLayout={handleDeleteLayout}
+        isPlacingRegularAisle={isPlacingRegularAisle}
+        handleAddAisle={() => setIsPlacingRegularAisle(true)}
+        handleRemoveAisle={removeSelectedAisle}
+        selectedAisle={selectedAisle}
+        isLoading={isLoading}
+        pendingChanges={pendingChanges}
+      />
 
       {/* Search Bar */}
       <SearchBar onSearch={handleSearch} />
