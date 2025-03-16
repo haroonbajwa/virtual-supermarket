@@ -544,7 +544,6 @@ const Store = () => {
                     isSuccess: true
                   });
                   focusCameraOnRack(aisle.id, rack.id, 'left');
-                  return; // Exit after finding the first match
                 }
               }
             }
@@ -575,7 +574,6 @@ const Store = () => {
                     isSuccess: true
                   });
                   focusCameraOnRack(aisle.id, rack.id, 'right');
-                  return; // Exit after finding the first match
                 }
               }
             }
@@ -621,7 +619,7 @@ const Store = () => {
     const rackRotation = rack.rackDegree ? (rack.rackDegree * Math.PI / 180) : 0;
     
     // Calculate camera position based on rack position, side, and rotation
-    const distance = 5; // Reduced distance to get closer to the rack
+    const distance = 4; // Reduced distance to get closer to the rack
     const height = 1.8;   // Adjusted height for better view
     
     // Calculate position with rotation consideration
