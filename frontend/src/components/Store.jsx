@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -10,6 +11,7 @@ import Aisle from './Aisle';
 import { layoutService } from '../services/layout.service';
 import SearchBar from './SearchBar';
 import Sidebar from './Sidebar';
+import { setAisles, selectAisles } from '../store/aislesSlice';
 
 // Realistic color palette
 const colors = {
@@ -24,112 +26,8 @@ const colors = {
 };
 
 const Store = () => {
-  const [aisles, setAisles] = useState([
-    {
-      id: 0,
-      position: [0, 0, 0],
-      aisleDegree: 360,
-      racks: Array.from({ length: 3 }, (_, index) => ({
-        id: `A0-R${index + 1}`,
-        position: [index * 3, 0, 0],
-        rackType: 'd-rack', // Default rack type
-        sides: {
-          left: {
-            id: `A0-R${index + 1}-L`,
-            shelvesCount: 4,
-            slotsPerShelf: [3, 3, 3, 3],
-            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-              id: `A0-R${index + 1}-L-SH${shelfIndex + 1}`,
-              slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                const slotId = `A0-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                return {
-                  id: slotId,
-                  productId: `P${Math.floor(Math.random() * 1000)}`,
-                  productName: `Product ${Math.floor(Math.random() * 100)}`,
-                  description: `Description for product in slot ${slotId}`,
-                  price: (Math.random() * 100).toFixed(2),
-                  quantity: Math.floor(Math.random() * 50)
-                };
-              })
-            }))
-          },
-          right: {
-            id: `A0-R${index + 1}-R`,
-            shelvesCount: 4,
-            slotsPerShelf: [3, 3, 3, 3],
-            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-              id: `A0-R${index + 1}-R-SH${shelfIndex + 1}`,
-              slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                const slotId = `A0-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                return {
-                  id: slotId,
-                  productId: `P${Math.floor(Math.random() * 1000)}`,
-                  productName: `Product ${Math.floor(Math.random() * 100)}`,
-                  description: `Description for product in slot ${slotId}`,
-                  price: (Math.random() * 100).toFixed(2),
-                  quantity: Math.floor(Math.random() * 50)
-                };
-              })
-            }))
-          }
-        },
-        size: { width: 2, depth: 1, height: 3 },
-        color: `hsl(${Math.random() * 360}, 70%, 60%)`
-      }))
-    },
-    {
-      id: 1,
-      position: [0, 0, 5],
-      aisleDegree: 360,
-      racks: Array.from({ length: 3 }, (_, index) => ({
-        id: `A1-R${index + 1}`,
-        position: [index * 3, 0, 0],
-        rackType: 'd-rack', // Default rack type
-        sides: {
-          left: {
-            id: `A1-R${index + 1}-L`,
-            shelvesCount: 4,
-            slotsPerShelf: [3, 3, 3, 3],
-            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-              id: `A1-R${index + 1}-L-SH${shelfIndex + 1}`,
-              slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                const slotId = `A1-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                return {
-                  id: slotId,
-                  productId: `P${Math.floor(Math.random() * 1000)}`,
-                  productName: `Product ${Math.floor(Math.random() * 100)}`,
-                  description: `Description for product in slot ${slotId}`,
-                  price: (Math.random() * 100).toFixed(2),
-                  quantity: Math.floor(Math.random() * 50)
-                };
-              })
-            }))
-          },
-          right: {
-            id: `A1-R${index + 1}-R`,
-            shelvesCount: 4,
-            slotsPerShelf: [3, 3, 3, 3],
-            shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-              id: `A1-R${index + 1}-R-SH${shelfIndex + 1}`,
-              slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                const slotId = `A1-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                return {
-                  id: slotId,
-                  productId: `P${Math.floor(Math.random() * 1000)}`,
-                  productName: `Product ${Math.floor(Math.random() * 100)}`,
-                  description: `Description for product in slot ${slotId}`,
-                  price: (Math.random() * 100).toFixed(2),
-                  quantity: Math.floor(Math.random() * 50)
-                };
-              })
-            }))
-          }
-        },
-        size: { width: 2, depth: 1, height: 3 },
-        color: `hsl(${Math.random() * 360}, 70%, 60%)`
-      }))
-    }
-  ]);
+  const dispatch = useDispatch();
+  const aisles = useSelector(selectAisles);
   const [selectedAisle, setSelectedAisle] = useState(null);
   const [isPlacingRegularAisle, setIsPlacingRegularAisle] = useState(false);
   const [layouts, setLayouts] = useState([]);
@@ -141,8 +39,6 @@ const Store = () => {
   const [isLoading, setIsLoading] = useState(false);
   const cameraRef = useRef();
   const controlsRef = useRef();
-
-  console.log(aisles, "aisles state")
 
   // Fetch all layouts on component mount
   useEffect(() => {
@@ -205,7 +101,7 @@ const Store = () => {
     setIsLoading(true);
     try {
       const loadedLayout = await layoutService.getLayout(layout._id);
-      setAisles(loadedLayout.aisles);
+      dispatch(setAisles(loadedLayout.aisles));
       setSelectedLayout(loadedLayout);
       setLayoutName(loadedLayout.name);
       setPendingChanges(false);
@@ -217,16 +113,16 @@ const Store = () => {
     }
   };
 
-  const handleDeleteLayout = async (layout) => {
-    if (!window.confirm(`Are you sure you want to delete the layout "${layout.name}"?`)) {
+  const handleDeleteLayout = async (layoutId) => {
+    if (!window.confirm('Are you sure you want to delete this layout?')) {
       return;
     }
 
     setIsLoading(true);
     try {
-      await layoutService.deleteLayout(layout._id);
-      setLayouts(layouts.filter(l => l._id !== layout._id));
-      if (selectedLayout?._id === layout._id) {
+      await layoutService.deleteLayout(layoutId);
+      setLayouts(layouts.filter(l => l._id !== layoutId));
+      if (selectedLayout?._id === layoutId) {
         setSelectedLayout(null);
         setLayoutName('');
       }
@@ -238,41 +134,26 @@ const Store = () => {
     }
   };
 
-  const handleUpdateLayout = () => {
-    if (selectedLayout && pendingChanges) {
-      console.log('Manually updating layout with current aisles');
-      layoutService.updateLayout(selectedLayout._id, {
-        ...selectedLayout,
-        aisles: aisles
-      }).then(() => {
-        console.log('Layout updated successfully');
-        setPendingChanges(false);
-      }).catch(error => {
-        console.error('Error updating layout:', error);
-      });
-    }
-  };
-
   const addAisle = (point) => {
-    setAisles(prevAisles => [
-      ...prevAisles,
+    dispatch(setAisles([
+      ...aisles,
       {
-        id: prevAisles.length,
+        id: aisles.length,
         position: [point.x, 0, point.z],
         aisleDegree: 360,
         racks: Array.from({ length: 3 }, (_, index) => ({
-          id: `A${prevAisles.length}-R${index + 1}`,
+          id: `A${aisles.length}-R${index + 1}`,
           position: [index * 3, 0, 0],
           rackType: 'd-rack', // Default rack type
           sides: {
             left: {
-              id: `A${prevAisles.length}-R${index + 1}-L`,
+              id: `A${aisles.length}-R${index + 1}-L`,
               shelvesCount: 4,
               slotsPerShelf: [3, 3, 3, 3],
               shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-                id: `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}`,
+                id: `A${aisles.length}-R${index + 1}-L-SH${shelfIndex + 1}`,
                 slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                  const slotId = `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                  const slotId = `A${aisles.length}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
                   return {
                     id: slotId,
                     productId: `P${Math.floor(Math.random() * 1000)}`,
@@ -285,13 +166,13 @@ const Store = () => {
               }))
             },
             right: {
-              id: `A${prevAisles.length}-R${index + 1}-R`,
+              id: `A${aisles.length}-R${index + 1}-R`,
               shelvesCount: 4,
               slotsPerShelf: [3, 3, 3, 3],
               shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-                id: `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}`,
+                id: `A${aisles.length}-R${index + 1}-R-SH${shelfIndex + 1}`,
                 slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                  const slotId = `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
+                  const slotId = `A${aisles.length}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
                   return {
                     id: slotId,
                     productId: `P${Math.floor(Math.random() * 1000)}`,
@@ -308,13 +189,13 @@ const Store = () => {
           color: `hsl(${Math.random() * 360}, 70%, 60%)`
         }))
       }
-    ]);
+    ]));
     setIsPlacingRegularAisle(false);
   };
 
   const removeSelectedAisle = () => {
     if (selectedAisle !== null) {
-      setAisles(prevAisles => prevAisles.filter(aisle => aisle.id !== selectedAisle));
+      dispatch(setAisles(aisles.filter(aisle => aisle.id !== selectedAisle)));
       setSelectedAisle(null);
     }
   };
@@ -322,183 +203,125 @@ const Store = () => {
   const updateRackData = (aisleId, rackData) => {
     console.log('Store updating rack data:', { aisleId, rackData });
     
-    setAisles(prevAisles => {
-      const updatedAisles = prevAisles.map(aisle => {
-        if (aisle.id === aisleId) {
-          // Handle aisle position update
-          if (rackData.position) {
-            console.log('Updating aisle position:', rackData.position);
-            const updatedAisle = {
-              ...aisle,
-              id: aisle.id,
-              aisleDegree: aisle.aisleDegree || 360,
-              position: rackData.position,
-              racks: aisle.racks || []
-            };
-            setPendingChanges(true);
-            return updatedAisle;
-          }
-
-          // Handle aisle rotation
-          if (rackData.aisleDegree !== undefined) {
-            console.log('Rotating aisle to:', rackData.aisleDegree);
-            const updatedAisle = {
-              ...aisle,
-              aisleDegree: rackData.aisleDegree
-            };
-            setPendingChanges(true);
-            return updatedAisle;
-          }
-          
-          // Handle rack updates
-          if (rackData.racks) {
-            console.log('Store handling rack update:', rackData.racks);
-            const updatedAisle = {
-              ...aisle,
-              racks: rackData.racks.map(rack => {
-                const updatedRack = {
-                  ...rack,
-                  id: rack.id,
-                  position: rack.position,
-                  rackDegree: rack.rackDegree,
-                  rackType: rack.rackType || 'd-rack',
-                  sides: rack.sides || {
-                    left: { shelves: [] },
-                    right: { shelves: [] }
-                  },
-                  size: rack.size || { width: 2, depth: 1, height: 3 },
-                  color: rack.color || "hsl(263.1184617437402, 70%, 60%)"
-                };
-                console.log('Updated rack with data:', updatedRack);
-                return updatedRack;
-              })
-            };
-            setPendingChanges(true);
-            return updatedAisle;
-          }
-
-          // Handle single rack update
-          if (rackData.id) {
-            const updatedAisle = {
-              ...aisle,
-              racks: aisle.racks.map(rack => {
-                if (rack.id === rackData.id) {
-                  let updatedRack = { ...rack };
-                  
-                  // Update position if provided
-                  if (rackData.position) {
-                    console.log('Updating rack position:', rackData.position);
-                    updatedRack = {
-                      ...updatedRack,
-                      position: rackData.position
-                    };
-                  }
-
-                  // Handle slot updates
-                  if (rackData.updatedSlot) {
-                    const { side, shelfIndex, slotIndex, ...slotData } = rackData.updatedSlot;
-                    const targetSide = side === 'L' ? 'left' : 'right';
-                    
-                    updatedRack.sides = {
-                      ...rack.sides,
-                      [targetSide]: {
-                        ...rack.sides[targetSide],
-                        shelves: rack.sides[targetSide].shelves.map((shelf, sIndex) => {
-                          if (sIndex === shelfIndex) {
-                            return {
-                              ...shelf,
-                              slots: shelf.slots.map((slot, slIndex) => {
-                                if (slIndex === slotIndex) {
-                                  return {
-                                    ...slot,
-                                    ...slotData
-                                  };
-                                }
-                                return slot;
-                              })
-                            };
-                          }
-                          return shelf;
-                        })
-                      }
-                    };
-                  }
-                  return updatedRack;
-                }
-                return rack;
-              })
-            };
-            setPendingChanges(true);
-            return updatedAisle;
-          }
+    dispatch(setAisles(aisles.map(aisle => {
+      if (aisle.id === aisleId) {
+        // Handle aisle position update
+        if (rackData.position) {
+          console.log('Updating aisle position:', rackData.position);
+          const updatedAisle = {
+            ...aisle,
+            id: aisle.id,
+            position: rackData.position,
+            aisleDegree: aisle.aisleDegree || 360, // Preserve the existing rotation
+            racks: aisle.racks || []
+          };
+          setPendingChanges(true);
+          return updatedAisle;
         }
-        return aisle;
-      });
-      
-      console.log('Store updated aisles:', updatedAisles);
-      return updatedAisles;
-    });
+
+        // Handle aisle rotation
+        if (rackData.aisleDegree !== undefined) {
+          console.log('Rotating aisle to:', rackData.aisleDegree);
+          const updatedAisle = {
+            ...aisle,
+            aisleDegree: rackData.aisleDegree
+          };
+          setPendingChanges(true);
+          return updatedAisle;
+        }
+        
+        // Handle rack updates
+        if (rackData.racks) {
+          console.log('Store handling rack update:', rackData.racks);
+          const updatedAisle = {
+            ...aisle,
+            racks: rackData.racks.map(rack => {
+              const updatedRack = {
+                ...rack,
+                id: rack.id,
+                position: rack.position,
+                rackDegree: rack.rackDegree,
+                rackType: rack.rackType || 'd-rack',
+                sides: rack.sides || {
+                  left: { shelves: [] },
+                  right: { shelves: [] }
+                },
+                size: rack.size || { width: 2, depth: 1, height: 3 },
+                color: rack.color || "hsl(263.1184617437402, 70%, 60%)"
+              };
+              console.log('Updated rack with data:', updatedRack);
+              return updatedRack;
+            })
+          };
+          setPendingChanges(true);
+          return updatedAisle;
+        }
+
+        // Handle single rack update
+        if (rackData.id) {
+          const updatedAisle = {
+            ...aisle,
+            racks: aisle.racks.map(rack => {
+              if (rack.id === rackData.id) {
+                let updatedRack = { ...rack };
+                
+                // Update position if provided
+                if (rackData.position) {
+                  console.log('Updating rack position:', rackData.position);
+                  updatedRack = {
+                    ...updatedRack,
+                    position: rackData.position
+                  };
+                }
+
+                // Handle slot updates
+                if (rackData.updatedSlot) {
+                  const { side, shelfIndex, slotIndex, ...slotData } = rackData.updatedSlot;
+                  const targetSide = side === 'L' ? 'left' : 'right';
+                  
+                  updatedRack.sides = {
+                    ...rack.sides,
+                    [targetSide]: {
+                      ...rack.sides[targetSide],
+                      shelves: rack.sides[targetSide].shelves.map((shelf, sIndex) => {
+                        if (sIndex === shelfIndex) {
+                          return {
+                            ...shelf,
+                            slots: shelf.slots.map((slot, slIndex) => {
+                              if (slIndex === slotIndex) {
+                                return {
+                                  ...slot,
+                                  ...slotData
+                                };
+                              }
+                              return slot;
+                            })
+                          };
+                        }
+                        return shelf;
+                      })
+                    }
+                  };
+                }
+                return updatedRack;
+              }
+              return rack;
+            })
+          };
+          setPendingChanges(true);
+          return updatedAisle;
+        }
+      }
+      return aisle;
+    })));
+    
+    console.log('Store updated aisles:', aisles);
   };
 
   const handlePlaneClick = (event) => {
     if (isPlacingRegularAisle) {
       const point = event.point;
-      setAisles(prevAisles => [
-        ...prevAisles,
-        {
-          id: prevAisles.length,
-          position: [point.x, 0, point.z],
-          aisleDegree: 360,
-          racks: Array.from({ length: 3 }, (_, index) => ({
-            id: `A${prevAisles.length}-R${index + 1}`,
-            position: [index * 3, 0, 0],
-            rackType: 'd-rack', // Default rack type
-            sides: {
-              left: {
-                id: `A${prevAisles.length}-R${index + 1}-L`,
-                shelvesCount: 4,
-                slotsPerShelf: [3, 3, 3, 3],
-                shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-                  id: `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}`,
-                  slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                    const slotId = `A${prevAisles.length}-R${index + 1}-L-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                    return {
-                      id: slotId,
-                      productId: `P${Math.floor(Math.random() * 1000)}`,
-                      productName: `Product ${Math.floor(Math.random() * 100)}`,
-                      description: `Description for product in slot ${slotId}`,
-                      price: (Math.random() * 100).toFixed(2),
-                      quantity: Math.floor(Math.random() * 50)
-                    };
-                  })
-                }))
-              },
-              right: {
-                id: `A${prevAisles.length}-R${index + 1}-R`,
-                shelvesCount: 4,
-                slotsPerShelf: [3, 3, 3, 3],
-                shelves: Array.from({ length: 4 }, (_, shelfIndex) => ({
-                  id: `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}`,
-                  slots: Array.from({ length: 3 }, (_, slotIndex) => {
-                    const slotId = `A${prevAisles.length}-R${index + 1}-R-SH${shelfIndex + 1}-S${slotIndex + 1}`;
-                    return {
-                      id: slotId,
-                      productId: `P${Math.floor(Math.random() * 1000)}`,
-                      productName: `Product ${Math.floor(Math.random() * 100)}`,
-                      description: `Description for product in slot ${slotId}`,
-                      price: (Math.random() * 100).toFixed(2),
-                      quantity: Math.floor(Math.random() * 50)
-                    };
-                  })
-                }))
-              }
-            },
-            size: { width: 2, depth: 1, height: 3 },
-            color: `hsl(${Math.random() * 360}, 70%, 60%)`
-          }))
-        }
-      ]);
-      setIsPlacingRegularAisle(false);
+      addAisle(point);
     }
   };
 

@@ -282,9 +282,10 @@ const Aisle = ({
       setCurrentPosition(prevPosition => {
         const newPosition = moveRack(prevPosition, direction);
         
-        // Notify parent about position update
+        // Notify parent about position update with current rotation
         onRackUpdate({
-          position: newPosition
+          position: newPosition,
+          aisleDegree: ((currentRotation * 180 / Math.PI) % 360) || 360
         });
         
         return newPosition;
@@ -298,7 +299,7 @@ const Aisle = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSelected]); // Remove currentPosition from dependencies
+  }, [isSelected, currentRotation]); // Add currentRotation to dependencies
 
   return (
     <group position={currentPosition} rotation={[0, currentRotation, 0]}>
@@ -333,25 +334,53 @@ const Aisle = ({
             <ControlButton
               position={[0, 0.4, 0]}
               label="↑"
-              onClick={() => setCurrentPosition(moveRack(currentPosition, 'up'))}
+              onClick={() => {
+                const newPosition = moveRack(currentPosition, 'up');
+                setCurrentPosition(newPosition);
+                onRackUpdate({
+                  position: newPosition,
+                  aisleDegree: ((currentRotation * 180 / Math.PI) % 360) || 360
+                });
+              }}
             />
             {/* Down Button */}
             <ControlButton
               position={[0, 0, 0]}
               label="↓"
-              onClick={() => setCurrentPosition(moveRack(currentPosition, 'down'))}
+              onClick={() => {
+                const newPosition = moveRack(currentPosition, 'down');
+                setCurrentPosition(newPosition);
+                onRackUpdate({
+                  position: newPosition,
+                  aisleDegree: ((currentRotation * 180 / Math.PI) % 360) || 360
+                });
+              }}
             />
             {/* Left Button */}
             <ControlButton
               position={[-0.4, 0, 0]}
               label="←"
-              onClick={() => setCurrentPosition(moveRack(currentPosition, 'left'))}
+              onClick={() => {
+                const newPosition = moveRack(currentPosition, 'left');
+                setCurrentPosition(newPosition);
+                onRackUpdate({
+                  position: newPosition,
+                  aisleDegree: ((currentRotation * 180 / Math.PI) % 360) || 360
+                });
+              }}
             />
             {/* Right Button */}
             <ControlButton
               position={[0.4, 0, 0]}
               label="→"
-              onClick={() => setCurrentPosition(moveRack(currentPosition, 'right'))}
+              onClick={() => {
+                const newPosition = moveRack(currentPosition, 'right');
+                setCurrentPosition(newPosition);
+                onRackUpdate({
+                  position: newPosition,
+                  aisleDegree: ((currentRotation * 180 / Math.PI) % 360) || 360
+                });
+              }}
             />
             {/* Rotate Button */}
             <ControlButton
