@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Canvas } from '@react-three/fiber';
 import {
   OrbitControls,
@@ -8,10 +9,11 @@ import {
   Box
 } from '@react-three/drei';
 import Aisle from './Aisle';
-import { layoutService } from '../services/layout.service';
 import SearchBar from './SearchBar';
 import Sidebar from './Sidebar';
 import { setAisles, selectAisles } from '../store/aislesSlice';
+import { useAuth } from '../context/AuthContext';
+import { getLayoutById, updateLayout } from '../services/api.service';
 
 // Realistic color palette
 const colors = {
@@ -26,33 +28,47 @@ const colors = {
 };
 
 const Store = () => {
+  const { layoutId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const dispatch = useDispatch();
   const aisles = useSelector(selectAisles);
   const [selectedAisle, setSelectedAisle] = useState(null);
   const [isPlacingRegularAisle, setIsPlacingRegularAisle] = useState(false);
-  const [layouts, setLayouts] = useState([]);
-  const [selectedLayout, setSelectedLayout] = useState(null);
+  const [layout, setLayout] = useState(null);
   const [layoutName, setLayoutName] = useState('');
   const [pendingChanges, setPendingChanges] = useState(false);
   const [searchResult, setSearchResult] = useState({ visible: false, message: '', isSuccess: false });
   const [highlightedProduct, setHighlightedProduct] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
   const cameraRef = useRef();
   const controlsRef = useRef();
 
-  // Fetch all layouts on component mount
+  // Load layout by ID from URL
   useEffect(() => {
-    loadLayouts();
-  }, []);
+    const loadLayout = async () => {
+      if (!layoutId) return;
+      
+      try {
+        setIsLoading(true);
+        const response = await getLayoutById(layoutId);
+        const loadedLayout = response.data;
+        
+        setLayout(loadedLayout);
+        setLayoutName(loadedLayout.name);
+        dispatch(setAisles(loadedLayout.aisles || []));
+        setPendingChanges(false);
+      } catch (err) {
+        console.error('Error loading layout:', err);
+        setError('Failed to load layout. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const loadLayouts = async () => {
-    try {
-      const fetchedLayouts = await layoutService.getAllLayouts();
-      setLayouts(fetchedLayouts);
-    } catch (error) {
-      console.error('Error loading layouts:', error);
-    }
-  };
+    loadLayout();
+  }, [layoutId, dispatch]);
 
   const handleSaveLayout = async () => {
     if (!layoutName.trim()) {
@@ -62,29 +78,13 @@ const Store = () => {
 
     setIsLoading(true);
     try {
-      if (selectedLayout) {
-        await layoutService.updateLayout(selectedLayout._id, {
-          ...selectedLayout,
-          name: layoutName,
-          aisles: aisles
-        });
-        const updatedLayouts = layouts.map(l => 
-          l._id === selectedLayout._id 
-            ? { ...l, name: layoutName }
-            : l
-        );
-        setLayouts(updatedLayouts);
-        alert('Layout updated successfully!');
-      } else {
-        const newLayout = await layoutService.createLayout({
-          name: layoutName,
-          aisles: aisles
-        });
-        setLayouts([...layouts, newLayout]);
-        setSelectedLayout(newLayout);
-        alert('Layout saved successfully!');
-      }
+      await updateLayout(layoutId, {
+        name: layoutName,
+        aisles: aisles
+      });
+      
       setPendingChanges(false);
+      alert('Layout updated successfully!');
     } catch (error) {
       console.error('Error saving layout:', error);
       alert('Failed to save layout. Please try again.');
@@ -93,45 +93,11 @@ const Store = () => {
     }
   };
 
-  const handleLoadLayout = async (layout) => {
+  const handleBackToDashboard = () => {
     if (pendingChanges && !window.confirm('You have unsaved changes. Do you want to proceed and lose these changes?')) {
       return;
     }
-
-    setIsLoading(true);
-    try {
-      const loadedLayout = await layoutService.getLayout(layout._id);
-      dispatch(setAisles(loadedLayout.aisles));
-      setSelectedLayout(loadedLayout);
-      setLayoutName(loadedLayout.name);
-      setPendingChanges(false);
-    } catch (error) {
-      console.error('Error loading layout:', error);
-      alert('Failed to load layout. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteLayout = async (layoutId) => {
-    if (!window.confirm('Are you sure you want to delete this layout?')) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await layoutService.deleteLayout(layoutId);
-      setLayouts(layouts.filter(l => l._id !== layoutId));
-      if (selectedLayout?._id === layoutId) {
-        setSelectedLayout(null);
-        setLayoutName('');
-      }
-    } catch (error) {
-      console.error('Error deleting layout:', error);
-      alert('Failed to delete layout. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    navigate(user.role === 'admin' ? '/admin' : '/owner');
   };
 
   const addAisle = (point) => {
@@ -190,6 +156,7 @@ const Store = () => {
         }))
       }
     ]));
+    setPendingChanges(true);
     setIsPlacingRegularAisle(false);
   };
 
@@ -197,6 +164,7 @@ const Store = () => {
     if (selectedAisle !== null) {
       dispatch(setAisles(aisles.filter(aisle => aisle.id !== selectedAisle)));
       setSelectedAisle(null);
+      setPendingChanges(true);
     }
   };
 
@@ -540,11 +508,8 @@ const Store = () => {
       <Sidebar
         layoutName={layoutName}
         setLayoutName={setLayoutName}
-        layouts={layouts}
-        selectedLayout={selectedLayout}
         handleSaveLayout={handleSaveLayout}
-        handleLoadLayout={handleLoadLayout}
-        handleDeleteLayout={handleDeleteLayout}
+        handleBackToDashboard={handleBackToDashboard}
         isPlacingRegularAisle={isPlacingRegularAisle}
         handleAddAisle={() => setIsPlacingRegularAisle(true)}
         handleRemoveAisle={removeSelectedAisle}

@@ -4,11 +4,8 @@ import './Sidebar.css';
 const Sidebar = ({ 
   layoutName, 
   setLayoutName, 
-  layouts, 
-  selectedLayout, 
   handleSaveLayout, 
-  handleLoadLayout, 
-  handleDeleteLayout,
+  handleBackToDashboard,
   isPlacingRegularAisle,
   handleAddAisle,
   handleRemoveAisle,
@@ -47,37 +44,16 @@ const Sidebar = ({
                 className={`save-button ${pendingChanges ? 'pending' : ''}`}
                 disabled={isLoading}
               >
-                {isLoading ? 'Processing...' : selectedLayout ? 'Update Layout' : 'Save Layout'}
+                {isLoading ? 'Processing...' : 'Save Layout'}
                 {pendingChanges && <span className="pending-dot" title="You have unsaved changes"></span>}
               </button>
-            </div>
-
-            <div className="layouts-list">
-              <h4>Saved Layouts</h4>
-              {layouts.map(layout => (
-                <div
-                  key={layout._id}
-                  className={`layout-item ${selectedLayout?._id === layout._id ? 'selected' : ''}`}
-                >
-                  <span>{layout.name}</span>
-                  <div className="layout-buttons">
-                    <button
-                      onClick={() => handleLoadLayout(layout)}
-                      className="load-button"
-                      disabled={isLoading}
-                    >
-                      {isLoading && selectedLayout?._id === layout._id ? 'Loading...' : 'Load'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteLayout(layout)}
-                      className="delete-button"
-                      disabled={isLoading}
-                    >
-                      {isLoading && selectedLayout?._id === layout._id ? 'Deleting...' : 'Delete'}
-                    </button>
-                  </div>
-                </div>
-              ))}
+              <button
+                onClick={handleBackToDashboard}
+                className="back-button"
+                disabled={isLoading}
+              >
+                Back to Dashboard
+              </button>
             </div>
           </div>
 

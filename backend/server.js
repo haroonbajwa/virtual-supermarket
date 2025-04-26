@@ -21,7 +21,12 @@ connection.once('open', () => {
 });
 
 // Routes
-const layoutRoutes = require('./routes/layout.routes');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const layoutRoutes = require('./routes/layouts');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/layouts', layoutRoutes);
 
 const PORT = process.env.PORT || 5000;
