@@ -269,8 +269,9 @@ const RackSide = ({
           id: `${shelfId}-S${slotIndex + 1}`,
           productId: "P484",
           productName: `Product ${slotIndex + 1}`,
-          description: `Description for product in ${shelfId}-S${slotIndex + 1
-            }`,
+          description: `Description for product in ${shelfId}-S${
+            slotIndex + 1
+          }`,
           price: "68.78",
           quantity: 49,
         })),
@@ -331,6 +332,7 @@ const SimplePlane = ({ side }) => {
 };
 
 const DoubleRack = ({
+  isEditMode,
   position = [0, 0, 0],
   size = { width: 3, height: 4, depth: 1 },
   color = "#34495e",
@@ -399,8 +401,9 @@ const DoubleRack = ({
         slots: Array(3)
           .fill()
           .map((_, i) => ({
-            id: `${rackId}-${side}-SH${targetSide.shelves.length + 1}-S${i + 1
-              }`,
+            id: `${rackId}-${side}-SH${targetSide.shelves.length + 1}-S${
+              i + 1
+            }`,
             productId: "",
             productName: `Product ${i + 1}`,
             description: `Description for slot ${i + 1}`,
@@ -617,7 +620,7 @@ const DoubleRack = ({
   return (
     <group position={currentPosition} rotation={[0, currentRotation, 0]}>
       {/* Movement Controls - Only show when selected */}
-      {isSelected && (
+      {isEditMode && isSelected && (
         <group>
           {/* Up Button */}
           <ControlButton
@@ -659,29 +662,33 @@ const DoubleRack = ({
         </group>
       )}
       {/* Controls Container */}
-      <group position={[0, size.height, 0]}>
-        {/* Selection Button - Centered and Above */}
-        <group position={[0, 0.8, 0]}>
-          <Box
-            args={[1.2, 0.4, 0.3]}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsSelected(!isSelected);
-            }}
-          >
-            <meshStandardMaterial color={isSelected ? "#4CAF50" : "#2196F3"} />
-          </Box>
-          <Text
-            position={[0, 0, 0.2]}
-            fontSize={0.2}
-            color="white"
-            anchorX="center"
-            anchorY="middle"
-          >
-            {isSelected ? "Selected" : "Select"}
-          </Text>
+      {isEditMode && (
+        <group position={[0, size.height, 0]}>
+          {/* Selection Button - Centered and Above */}
+          <group position={[0, 0.8, 0]}>
+            <Box
+              args={[1.2, 0.4, 0.3]}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsSelected(!isSelected);
+              }}
+            >
+              <meshStandardMaterial
+                color={isSelected ? "#4CAF50" : "#2196F3"}
+              />
+            </Box>
+            <Text
+              position={[0, 0, 0.2]}
+              fontSize={0.2}
+              color="white"
+              anchorX="center"
+              anchorY="middle"
+            >
+              {isSelected ? "Selected" : "Select"}
+            </Text>
+          </group>
         </group>
-      </group>
+      )}
 
       {/* Vertical Supports */}
       {[...Array(2)].map((_, i) => (
@@ -747,162 +754,166 @@ const DoubleRack = ({
       )}
 
       {/* Control Panel on Top */}
-      <group position={[0, size.height + 0.3, 0]}>
-        {/* Left Side Controls */}
-        <group position={[-0.8, 0, 0]}>
-          <ControlButton
-            position={[0.62, 0.1, 0]}
-            label={hiddenSide === "left" ? "L-Show" : "L-Hide"}
-            onClick={(e) => {
-              e.stopPropagation();
-              const newHiddenSide = hiddenSide === "left" ? null : "left";
-              setHiddenSide(newHiddenSide);
-              handleRackTypeChange(
-                newHiddenSide === "left" ? "r-rack" : "d-rack"
-              );
-            }}
-            color={hiddenSide === "left" ? "#ff4444" : "#4CAF50"}
-            labelColor="black"
-          />
-        </group>
+      {isEditMode && (
+        <group position={[0, size.height + 0.3, 0]}>
+          {/* Left Side Controls */}
+          <group position={[-0.8, 0, 0]}>
+            <ControlButton
+              position={[0.62, 0.1, 0]}
+              label={hiddenSide === "left" ? "L-Show" : "L-Hide"}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newHiddenSide = hiddenSide === "left" ? null : "left";
+                setHiddenSide(newHiddenSide);
+                handleRackTypeChange(
+                  newHiddenSide === "left" ? "r-rack" : "d-rack"
+                );
+              }}
+              color={hiddenSide === "left" ? "#ff4444" : "#4CAF50"}
+              labelColor="black"
+            />
+          </group>
 
-        {/* Right Side Controls */}
-        <group position={[0.8, 0, 0]}>
-          <ControlButton
-            position={[-0.62, 0.1, 0]}
-            label={hiddenSide === "right" ? "R-Show" : "R-Hide"}
-            onClick={(e) => {
-              e.stopPropagation();
-              const newHiddenSide = hiddenSide === "right" ? null : "right";
-              setHiddenSide(newHiddenSide);
-              handleRackTypeChange(
-                newHiddenSide === "right" ? "l-rack" : "d-rack"
-              );
-            }}
-            color={hiddenSide === "right" ? "#ff4444" : "#4CAF50"}
-            labelColor="black"
-          />
-        </group>
+          {/* Right Side Controls */}
+          <group position={[0.8, 0, 0]}>
+            <ControlButton
+              position={[-0.62, 0.1, 0]}
+              label={hiddenSide === "right" ? "R-Show" : "R-Hide"}
+              onClick={(e) => {
+                e.stopPropagation();
+                const newHiddenSide = hiddenSide === "right" ? null : "right";
+                setHiddenSide(newHiddenSide);
+                handleRackTypeChange(
+                  newHiddenSide === "right" ? "l-rack" : "d-rack"
+                );
+              }}
+              color={hiddenSide === "right" ? "#ff4444" : "#4CAF50"}
+              labelColor="black"
+            />
+          </group>
 
-        {/* Left Side Controls - Only show if not hidden */}
-        {hiddenSide !== "left" && (
-          <group position={[-size.width / 2 + 0.5, 0, -size.depth / 4]}>
-            <Text
-              position={[0, 0, 0]}
-              fontSize={0.15}
-              color="black"
-              anchorX="center"
-              rotation={[0, Math.PI, 0]}
-            >
-              Left Side
-            </Text>
-            <group position={[-0.2, -0.2, 0]}>
-              <ControlButton
-                position={[0, 0, 0]}
-                label="-"
-                onClick={() => handleShelfChange("left", "remove")}
-                color="#e74c3c"
-              />
+          {/* Left Side Controls - Only show if not hidden */}
+          {hiddenSide !== "left" && (
+            <group position={[-size.width / 2 + 0.5, 0, -size.depth / 4]}>
               <Text
-                position={[0.2, 0, 0]}
+                position={[0, 0, 0]}
                 fontSize={0.15}
                 color="black"
                 anchorX="center"
                 rotation={[0, Math.PI, 0]}
               >
-                {sides.left.shelves.length}
+                Left Side
               </Text>
-              <ControlButton
-                position={[0.4, 0, 0]}
-                label="+"
-                onClick={() => handleShelfChange("left", "add")}
-              />
-            </group>
-            {selectedShelf.side === "left" && selectedShelf.index !== -1 && (
-              <group position={[1, -0.2, 0]}>
+              <group position={[-0.2, -0.2, 0]}>
+                <ControlButton
+                  position={[0, 0, 0]}
+                  label="-"
+                  onClick={() => handleShelfChange("left", "remove")}
+                  color="#e74c3c"
+                />
                 <Text
-                  position={[0, 0.2, 0]}
-                  fontSize={0.12}
+                  position={[0.2, 0, 0]}
+                  fontSize={0.15}
                   color="black"
                   anchorX="center"
                   rotation={[0, Math.PI, 0]}
                 >
-                  Slots: {sides.left.shelves[selectedShelf.index].slots.length}
+                  {sides.left.shelves.length}
                 </Text>
                 <ControlButton
-                  position={[-0.2, 0, 0]}
-                  label="-"
-                  onClick={() => handleSlotChange("remove")}
-                  color="#e74c3c"
-                />
-                <ControlButton
-                  position={[0.2, 0, 0]}
+                  position={[0.4, 0, 0]}
                   label="+"
-                  onClick={() => handleSlotChange("add")}
+                  onClick={() => handleShelfChange("left", "add")}
                 />
               </group>
-            )}
-          </group>
-        )}
+              {selectedShelf.side === "left" && selectedShelf.index !== -1 && (
+                <group position={[1, -0.2, 0]}>
+                  <Text
+                    position={[0, 0.2, 0]}
+                    fontSize={0.12}
+                    color="black"
+                    anchorX="center"
+                    rotation={[0, Math.PI, 0]}
+                  >
+                    Slots:{" "}
+                    {sides.left.shelves[selectedShelf.index].slots.length}
+                  </Text>
+                  <ControlButton
+                    position={[-0.2, 0, 0]}
+                    label="-"
+                    onClick={() => handleSlotChange("remove")}
+                    color="#e74c3c"
+                  />
+                  <ControlButton
+                    position={[0.2, 0, 0]}
+                    label="+"
+                    onClick={() => handleSlotChange("add")}
+                  />
+                </group>
+              )}
+            </group>
+          )}
 
-        {/* Right Side Controls - Only show if not hidden */}
-        {hiddenSide !== "right" && (
-          <group position={[-size.width / 2 + 0.5, 0, size.depth / 4]}>
-            <Text
-              position={[0, 0, 0]}
-              fontSize={0.15}
-              color="black"
-              anchorX="center"
-            >
-              Right Side
-            </Text>
-            <group position={[-0.2, -0.2, 0]}>
-              <ControlButton
-                position={[0, 0, 0]}
-                label="-"
-                onClick={() => handleShelfChange("right", "remove")}
-                color="#e74c3c"
-              />
+          {/* Right Side Controls - Only show if not hidden */}
+          {hiddenSide !== "right" && (
+            <group position={[-size.width / 2 + 0.5, 0, size.depth / 4]}>
               <Text
-                position={[0.2, 0, 0]}
+                position={[0, 0, 0]}
                 fontSize={0.15}
                 color="black"
                 anchorX="center"
               >
-                {sides.right.shelves.length}
+                Right Side
               </Text>
-              <ControlButton
-                position={[0.4, 0, 0]}
-                label="+"
-                onClick={() => handleShelfChange("right", "add")}
-              />
-            </group>
-            {selectedShelf.side === "right" && selectedShelf.index !== -1 && (
-              <group position={[1, -0.2, 0]}>
+              <group position={[-0.2, -0.2, 0]}>
+                <ControlButton
+                  position={[0, 0, 0]}
+                  label="-"
+                  onClick={() => handleShelfChange("right", "remove")}
+                  color="#e74c3c"
+                />
                 <Text
-                  position={[0, 0.2, 0]}
-                  fontSize={0.12}
+                  position={[0.2, 0, 0]}
+                  fontSize={0.15}
                   color="black"
                   anchorX="center"
                 >
-                  Slots: {sides.right.shelves[selectedShelf.index].slots.length}
+                  {sides.right.shelves.length}
                 </Text>
                 <ControlButton
-                  position={[-0.2, 0, 0]}
-                  label="-"
-                  onClick={() => handleSlotChange("remove")}
-                  color="#e74c3c"
-                />
-                <ControlButton
-                  position={[0.2, 0, 0]}
+                  position={[0.4, 0, 0]}
                   label="+"
-                  onClick={() => handleSlotChange("add")}
+                  onClick={() => handleShelfChange("right", "add")}
                 />
               </group>
-            )}
-          </group>
-        )}
-      </group>
+              {selectedShelf.side === "right" && selectedShelf.index !== -1 && (
+                <group position={[1, -0.2, 0]}>
+                  <Text
+                    position={[0, 0.2, 0]}
+                    fontSize={0.12}
+                    color="black"
+                    anchorX="center"
+                  >
+                    Slots:{" "}
+                    {sides.right.shelves[selectedShelf.index].slots.length}
+                  </Text>
+                  <ControlButton
+                    position={[-0.2, 0, 0]}
+                    label="-"
+                    onClick={() => handleSlotChange("remove")}
+                    color="#e74c3c"
+                  />
+                  <ControlButton
+                    position={[0.2, 0, 0]}
+                    label="+"
+                    onClick={() => handleSlotChange("add")}
+                  />
+                </group>
+              )}
+            </group>
+          )}
+        </group>
+      )}
     </group>
   );
 };

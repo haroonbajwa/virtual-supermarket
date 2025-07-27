@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
 import { getLayouts } from "../services/api.service";
 
-const OwnerDashboard = () => {
+const StoreView = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
   const [layouts, setLayouts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -17,13 +15,12 @@ const OwnerDashboard = () => {
         const response = await getLayouts();
         setLayouts(response.data);
       } catch (err) {
-        setError("Failed to load layouts. Please try again.");
+        setError("Failed to load store layouts. Please try again.");
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    console.log("test call");
     fetchLayouts();
   }, []);
 
@@ -32,30 +29,24 @@ const OwnerDashboard = () => {
   }
 
   return (
-    <div className="owner-dashboard">
-      <header className="dashboard-header">
-        <h1>Store Owner Dashboard</h1>
-        <div className="user-info">
-          <span>Welcome, {user?.name}</span>
-          <button onClick={logout} className="logout-btn">
-            Logout
-          </button>
+    <div className="store-view">
+      <header className="view-header">
+        <h1>Virtual Supermarket</h1>
+        <div className="nav-links">
+          <a href="/" className="home-link">Home</a>
         </div>
       </header>
 
       {error && <div className="error-message">{error}</div>}
 
-      <div className="dashboard-content">
+      <div className="view-content">
         <section className="layouts-section">
-          <h2>My Store Layouts</h2>
+          <h2>Available Store Layouts</h2>
 
           {layouts.length === 0 ? (
             <div className="no-layouts">
-              <p>You do not have any layouts assigned to you yet.</p>
-              <p>
-                Please contact an administrator to get a layout assigned to your
-                store.
-              </p>
+              <p>No store layouts are currently available.</p>
+              <p>Please check back later.</p>
             </div>
           ) : (
             <div className="layouts-grid">
@@ -66,10 +57,10 @@ const OwnerDashboard = () => {
                     <p>Aisles: {layout.aisles?.length || 0}</p>
                   </div>
                   <button
-                    onClick={() => navigate(`/builder/${layout._id}`)}
+                    onClick={() => navigate(`/view/${layout._id}`)}
                     className="view-layout-btn"
                   >
-                    Edit Store Layout
+                    Browse Store
                   </button>
                 </div>
               ))}
@@ -81,4 +72,4 @@ const OwnerDashboard = () => {
   );
 };
 
-export default OwnerDashboard;
+export default StoreView;

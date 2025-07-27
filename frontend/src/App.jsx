@@ -4,6 +4,7 @@ import Store from './components/Store';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
+import StoreView from './pages/StoreView';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import './App.css';
 
@@ -30,8 +31,14 @@ const StoreWrapper = () => {
   const { user } = useAuth();
   return (
     <ProtectedRoute>
-      <Store />
+      <Store isEditMode={user?.role === 'admin' || user?.role === 'owner'} />
     </ProtectedRoute>
+  );
+};
+
+const StoreViewWrapper = () => {
+  return (
+    <Store isEditMode={false} />
   );
 };
 
@@ -52,6 +59,8 @@ function App() {
             </ProtectedRoute>
           } />
           <Route path="/builder/:layoutId" element={<StoreWrapper />} />
+          <Route path="/view/:layoutId" element={<StoreViewWrapper />} />
+          <Route path="/stores" element={<StoreView />} />
           <Route path="/" element={<Navigate to="/login" />} />
         </Routes>
       </Router>
